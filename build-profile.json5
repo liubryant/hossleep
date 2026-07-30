@@ -1,0 +1,83 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "/Users/liuzheng/.ohos/config/default_hossleep_deFB7x3dFxqwLO1E1BecJ1aXzuP6Y6iZCw7x2orXCbU=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001BA6F74CCD858AA2CD9E8EA002E322F5560435C12B2968DB9DB0306CB20D481BE5856BAD7D8BF5ED",
+          "profile": "/Users/liuzheng/.ohos/config/default_hossleep_deFB7x3dFxqwLO1E1BecJ1aXzuP6Y6iZCw7x2orXCbU=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/Users/liuzheng/.ohos/config/default_hossleep_deFB7x3dFxqwLO1E1BecJ1aXzuP6Y6iZCw7x2orXCbU=.p12",
+          "storePassword": "0000001B382710B7C963F8C51D00189E1B4F27F25BFFCC477C0DDF90CD439F9739F135E17CA6A7658F03F8"
+        }
+      },
+      {
+        "name": "release",
+        "type": "HarmonyOS",
+        "material": {
+          "storeFile": "/Users/liuzheng/Desktop/hoscsr/agentclaw.p12",
+          "storePassword": "000000182C10371E6D6C237462B3C1864FD5D43E3D2A258FB4E044CFBF68718378FE56CB972FDE8C",
+          "keyAlias": "agentclaw",
+          "keyPassword": "000000187551A3EA24FD5D7C92FE18CB8279B89649DEF88E6E00CDEC7392D93ABA5B165CD0053C50",
+          "signAlg": "SHA256withECDSA",
+          "profile": "/Users/liuzheng/Desktop/hoscsr/timesleepRelease.p7b",
+          "certpath": "/Users/liuzheng/Desktop/hoscsr/liuzheng.cer"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "targetSdkVersion": "6.1.1(24)",
+        "compatibleSdkVersion": "5.0.1(13)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      },
+      {
+        "name": "release",
+        "signingConfig": "release",
+        "targetSdkVersion": "6.1.1(24)",
+        "compatibleSdkVersion": "5.0.1(13)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default",
+            "release"
+          ]
+        }
+      ]
+    }
+  ]
+}

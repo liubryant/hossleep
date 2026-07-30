@@ -1,0 +1,6 @@
+{
+  "name": "libutdid_native.so",
+  "types": "./index.d.ts",
+  "version": "0.0.1",
+  "description": "Please describe the basic information."
+}

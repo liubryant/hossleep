@@ -1,0 +1,15 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "时光睡眠 HarmonyOS entry module.",
+  "main": "",
+  "author": "liuzheng",
+  "license": "",
+  "dependencies": {
+    "@cashier_alipay/cashiersdk": "^15.8.43",
+    "@umeng/analytics": "1.2.12",
+    "@umeng/common": "1.1.12"
+  },
+  "devDependencies": {},
+  "dynamicDependencies": {}
+}

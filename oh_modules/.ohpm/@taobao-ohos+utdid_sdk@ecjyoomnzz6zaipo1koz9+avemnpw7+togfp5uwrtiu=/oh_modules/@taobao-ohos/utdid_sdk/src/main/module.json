@@ -1,0 +1,44 @@
+{
+	"app": {
+		"bundleName": "com.alibaba.utdidapplication",
+		"debug": true,
+		"versionCode": 1000000,
+		"versionName": "1.0.0",
+		"minAPIVersion": 50000012,
+		"targetAPIVersion": 50000012,
+		"apiReleaseType": "Beta5",
+		"compileSdkVersion": "5.0.0.60",
+		"compileSdkType": "HarmonyOS",
+		"appEnvironments": [],
+		"bundleType": "app"
+	},
+	"module": {
+		"name": "utdid_sdk",
+		"type": "har",
+		"description": "$string:shared_desc",
+		"deviceTypes": [
+			"default",
+			"tablet",
+			"2in1"
+		],
+		"requestPermissions": [
+			{
+				"name": "ohos.permission.STORE_PERSISTENT_DATA",
+				"usedScene": {}
+			},
+			{
+				"name": "ohos.permission.GET_NETWORK_INFO",
+				"usedScene": {}
+			},
+			{
+				"name": "ohos.permission.INTERNET",
+				"usedScene": {}
+			}
+		],
+		"packageName": "@taobao-ohos/utdid_sdk",
+		"installationFree": false,
+		"virtualMachine": "ark12.0.2.0",
+		"compileMode": "esmodule",
+		"dependencies": []
+	}
+}

@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "ohos-module-entry": {
+    "SELECT_TARGET": "default",
+    "MODULE_BUILD_DIR": "/Users/liuzheng/githubProjects/hossleep/entry/build",
+    "TARGETS": {
+      "default": {
+        "SOURCE_ROOT": "/Users/liuzheng/githubProjects/hossleep/entry/src/main",
+        "RESOURCES_PATH": [
+          "/Users/liuzheng/githubProjects/hossleep/entry/src/main/resources"
+        ],
+        "BUILD_PATH": {
+          "OUTPUT_PATH": "/Users/liuzheng/githubProjects/hossleep/entry/build/default/outputs/default",
+          "INTERMEDIA_PATH": "/Users/liuzheng/githubProjects/hossleep/entry/build/default/intermediates",
+          "JS_ASSETS_PATH": "/Users/liuzheng/githubProjects/hossleep/entry/build/default/intermediates/loader_out/default",
+          "JS_LITE_ASSETS_PATH": "/Users/liuzheng/githubProjects/hossleep/entry/build/default/intermediates/loader_out_lite/default",
+          "RES_PATH": "/Users/liuzheng/githubProjects/hossleep/entry/build/default/intermediates/res/default",
+          "RES_PROFILE_PATH": "/Users/liuzheng/githubProjects/hossleep/entry/build/default/intermediates/res/default/resources/base/profile",
+          "ETS_SUPER_VISUAL_PATH": "/Users/liuzheng/githubProjects/hossleep/entry/build/default/cache/default/default@CompileArkTS/esmodule",
+          "JS_SUPER_VISUAL_PATH": "/Users/liuzheng/githubProjects/hossleep/entry/build/default/cache/default/default@CompileJS/jsbundle",
+          "WORKER_LOADER": "/Users/liuzheng/githubProjects/hossleep/entry/build/default/intermediates/loader/default/loader.json",
+          "MANIFEST_JSON": "/Users/liuzheng/githubProjects/hossleep/entry/build/default/intermediates/manifest/default",
+          "OUTPUT_METADATA_JSON": "/Users/liuzheng/githubProjects/hossleep/entry/build/default/intermediates/hap_metadata/default/output_metadata.json",
+          "SOURCE_MAP_DIR": "/Users/liuzheng/githubProjects/hossleep/entry/build/default/intermediates/source_map/default"
+        },
+        "BUILD_OPTION": {
+          "debuggable": true
+        }
+      }
+    },
+    "BUILD_OPTION": {
+      "default-default": {
+        "debuggable": true,
+        "copyFrom": "default",
+        "strictMode": {
+          "caseSensitiveCheck": true,
+          "useNormalizedOHMUrl": true
+        },
+        "resOptions": {
+          "copyCodeResource": {
+            "enable": false
+          }
+        }
+      }
+    },
+    "BUILD_PROFILE_OPT": {
+      "apiType": "stageMode",
+      "buildOption": {
+        "resOptions": {
+          "copyCodeResource": {
+            "enable": false
+          }
+        }
+      },
+      "targets": [
+        {
+          "name": "default",
+          "runtimeOS": "HarmonyOS"
+        }
+      ]
+    },
+    "BUILD_CACHE_DIR": ""
+  },
+  "ohos-project": {
+    "SELECT_PRODUCT_NAME": "default",
+    "MODULE_BUILD_DIR": "/Users/liuzheng/githubProjects/hossleep/build",
+    "BUNDLE_NAME": "hm.cjym.timesleep",
+    "VERSION_CODE": 1,
+    "VERSION_NAME": "1.0.0",
+    "BUILD_VERSION": "1",
+    "BUILD_PATH": {
+      "OUTPUT_PATH": "/Users/liuzheng/githubProjects/hossleep/build/outputs/default"
+    },
+    "MODULES": [
+      {
+        "name": "entry",
+        "srcPath": "/Users/liuzheng/githubProjects/hossleep/entry",
+        "targets": [
+          {
+            "name": "default",
+            "applyToProducts": [
+              "default",
+              "release"
+            ]
+          }
+        ],
+        "belongProjectPath": "/Users/liuzheng/githubProjects/hossleep"
+      }
+    ],
+    "PROFILE_OPT": {
+      "app": {
+        "signingConfigs": [
+          {
+            "name": "default",
+            "type": "HarmonyOS",
+            "material": {
+              "certpath": "/Users/liuzheng/.ohos/config/default_hossleep_deFB7x3dFxqwLO1E1BecJ1aXzuP6Y6iZCw7x2orXCbU=.cer",
+              "keyAlias": "debugKey",
+              "keyPassword": "0000001BA6F74CCD858AA2CD9E8EA002E322F5560435C12B2968DB9DB0306CB20D481BE5856BAD7D8BF5ED",
+              "profile": "/Users/liuzheng/.ohos/config/default_hossleep_deFB7x3dFxqwLO1E1BecJ1aXzuP6Y6iZCw7x2orXCbU=.p7b",
+              "signAlg": "SHA256withECDSA",
+              "storeFile": "/Users/liuzheng/.ohos/config/default_hossleep_deFB7x3dFxqwLO1E1BecJ1aXzuP6Y6iZCw7x2orXCbU=.p12",
+              "storePassword": "0000001B382710B7C963F8C51D00189E1B4F27F25BFFCC477C0DDF90CD439F9739F135E17CA6A7658F03F8"
+            }
+          },
+          {
+            "name": "release",
+            "type": "HarmonyOS",
+            "material": {
+              "storeFile": "/Users/liuzheng/Desktop/hoscsr/agentclaw.p12",
+              "storePassword": "000000182C10371E6D6C237462B3C1864FD5D43E3D2A258FB4E044CFBF68718378FE56CB972FDE8C",
+              "keyAlias": "agentclaw",
+              "keyPassword": "000000187551A3EA24FD5D7C92FE18CB8279B89649DEF88E6E00CDEC7392D93ABA5B165CD0053C50",
+              "signAlg": "SHA256withECDSA",
+              "profile": "/Users/liuzheng/Desktop/hoscsr/timesleepRelease.p7b",
+              "certpath": "/Users/liuzheng/Desktop/hoscsr/liuzheng.cer"
+            }
+          }
+        ],
+        "products": [
+          {
+            "name": "default",
+            "signingConfig": "default",
+            "targetSdkVersion": "6.1.1(24)",
+            "compatibleSdkVersion": "5.0.1(13)",
+            "runtimeOS": "HarmonyOS",
+            "buildOption": {
+              "strictMode": {
+                "caseSensitiveCheck": true,
+                "useNormalizedOHMUrl": true
+              }
+            }
+          },
+          {
+            "name": "release",
+            "signingConfig": "release",
+            "targetSdkVersion": "6.1.1(24)",
+            "compatibleSdkVersion": "5.0.1(13)",
+            "runtimeOS": "HarmonyOS",
+            "buildOption": {
+              "strictMode": {
+                "caseSensitiveCheck": true,
+                "useNormalizedOHMUrl": true
+              }
+            }
+          }
+        ],
+        "buildModeSet": [
+          {
+            "name": "debug"
+          },
+          {
+            "name": "release"
+          }
+        ]
+      },
+      "modules": [
+        {
+          "name": "entry",
+          "srcPath": "./entry",
+          "targets": [
+            {
+              "name": "default",
+              "applyToProducts": [
+                "default",
+                "release"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "CONFIG_PROPERTIES": {
+      "enableSignTask": true,
+      "skipNativeIncremental": false,
+      "hvigor.keepDependency": true
+    },
+    "OVERALL_PROJECT_PATHS": [
+      "/Users/liuzheng/githubProjects/hossleep"
+    ],
+    "BUILD_CACHE_DIR": ""
+  }
+}

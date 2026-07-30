@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "时光睡眠"
+    },
+    {
+      "name": "module_desc",
+      "value": "时光睡眠 HarmonyOS 应用模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "时光睡眠入口"
+    },
+    {
+      "name": "microphone_permission_reason",
+      "value": "用于睡眠监测时识别打鼾、咳嗽、梦话、磨牙和环境噪音"
+    }
+  ]
+}
