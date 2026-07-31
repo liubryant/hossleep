@@ -1,6 +1,0 @@
-string page_show 0x02000005
-string shared_desc 0x02000000
-color white 0x02000001
-media icon 0x02000002
-media setting 0x02000003
-profile main_pages 0x02000004

@@ -1,6 +1,0 @@
-{
-  "name": "libblueshield.so",
-  "types": "./index.d.ts",
-  "version": "1.0.8",
-  "description": "Please describe the basic information."
-}

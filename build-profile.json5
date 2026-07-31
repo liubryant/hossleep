@@ -5,13 +5,13 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "/Users/liuzheng/.ohos/config/default_hossleep_deFB7x3dFxqwLO1E1BecJ1aXzuP6Y6iZCw7x2orXCbU=.cer",
+          "certpath": "C:\\Users\\EDY\\.ohos\\config\\default_hossleep_eop8D6wJ3Invgs7f1kE9Teau_FQ1HCjuRGObZNykw0M=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001BA6F74CCD858AA2CD9E8EA002E322F5560435C12B2968DB9DB0306CB20D481BE5856BAD7D8BF5ED",
-          "profile": "/Users/liuzheng/.ohos/config/default_hossleep_deFB7x3dFxqwLO1E1BecJ1aXzuP6Y6iZCw7x2orXCbU=.p7b",
+          "keyPassword": "0000001BE30FC3F7DE8C9731267722FC7C2F6561362E2AAB2343038CC584484684F15A948F940592AC3E47",
+          "profile": "C:\\Users\\EDY\\.ohos\\config\\default_hossleep_eop8D6wJ3Invgs7f1kE9Teau_FQ1HCjuRGObZNykw0M=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "/Users/liuzheng/.ohos/config/default_hossleep_deFB7x3dFxqwLO1E1BecJ1aXzuP6Y6iZCw7x2orXCbU=.p12",
-          "storePassword": "0000001B382710B7C963F8C51D00189E1B4F27F25BFFCC477C0DDF90CD439F9739F135E17CA6A7658F03F8"
+          "storeFile": "C:\\Users\\EDY\\.ohos\\config\\default_hossleep_eop8D6wJ3Invgs7f1kE9Teau_FQ1HCjuRGObZNykw0M=.p12",
+          "storePassword": "0000001B5004B104D3C1BA53EEB68567F25340E4523B5194046C22505CBBFBFEE8E99EBFC7728A29782F7E"
         }
       },
       {
