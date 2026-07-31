@@ -1,0 +1,32 @@
+# HarmonyOS / Hvigor build outputs
+.hvigor/
+**/build/
+**/.cxx/
+
+# Installed dependencies
+oh_modules/
+**/oh_modules/
+node_modules/
+**/node_modules/
+
+# Local SDK and machine-specific settings
+local.properties
+
+# IDE metadata
+.idea/
+*.iml
+
+# Generated application packages and libraries
+*.hap
+*.har
+*.app
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Operating system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini

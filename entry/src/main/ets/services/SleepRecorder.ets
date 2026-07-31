@@ -58,6 +58,13 @@ export class SleepRecorder {
     return savedPath;
   }
 
+  static async getMaxAmplitude(): Promise<number> {
+    if (!SleepRecorder.recorder) {
+      return 0;
+    }
+    return await SleepRecorder.recorder.getAudioCapturerMaxAmplitude();
+  }
+
   static async cancel(): Promise<void> {
     if (SleepRecorder.recorder) {
       try {
