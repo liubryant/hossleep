@@ -3,12 +3,13 @@
  * @mail bryant_liu24@126.com
  */
 import { SleepColor, SleepRadius, SleepText } from '../../common/SleepDesign';
-import { SLEEP_EVENTS } from '../../models/SleepData';
-import { SleepEventSummaryItem } from '../../models/SleepModels';
+import { SleepDetectedEvent, SleepReportData } from '../../models/SleepModels';
 import { SoundCoverImage } from '../common/CoverImages';
 
 @Component
 export struct SleepHomePage {
+  private ringSettings: RenderingContextSettings = new RenderingContextSettings(true);
+  private ringContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.ringSettings);
   @Prop selectedPage: number = 0;
   @Prop isMonitoring: boolean = false;
   @Prop trendRange: number = 0;
@@ -17,6 +18,12 @@ export struct SleepHomePage {
   @Prop isRecordingPlaying: boolean = false;
   @Prop elapsedSeconds: number = 0;
   @Prop environmentDecibels: number = 0;
+  @Prop report: SleepReportData = {
+    hasData: false, endedAt: 0, durationSeconds: 0, averageDecibels: 0, peakDecibels: 0,
+    score: 60, efficiency: 0, quietPercent: 0, deepSeconds: 0,
+    lightSeconds: 0, dreamSeconds: 0, awakeSeconds: 0, events: []
+  };
+  @Prop reports: SleepReportData[] = [];
   onSelectPage: (index: number) => void = () => {};
   onToggleMonitoring: () => void = () => {};
   onSelectTrendRange: (index: number) => void = () => {};
@@ -208,13 +215,13 @@ export struct SleepHomePage {
   private eventSummary() {
     Column({ space: 10 }) {
       Row({ space: 10 }) {
-        this.eventMetric('打鼾', this.hasSleepData() ? 2 : 0)
+        this.eventMetric('打鼾', this.hasActualReport() ? 0 : 2)
         this.eventMetric('咳嗽', 0)
         this.eventMetric('说梦话', 0)
       }
       Row({ space: 10 }) {
-        this.eventMetric('磨牙', this.hasSleepData() ? 1 : 0)
-        this.eventMetric('环境噪音', this.hasSleepData() ? 4 : 0)
+        this.eventMetric('磨牙', this.hasActualReport() ? 0 : 1)
+        this.eventMetric('环境噪音', this.hasActualReport() ? this.report.events.length : 4)
         this.eventMetric('大口呼吸', 0)
       }
       Row({ space: 10 }) {
@@ -272,28 +279,13 @@ export struct SleepHomePage {
         .backgroundColor(Color.White)
         .borderRadius(8)
       }
-      if (this.hasSleepData()) {
-        this.chartBars()
-        Row({ space: 12 }) {
-          this.trendMetric('平均评分', '86 分')
-          this.trendMetric('打鼾', '2 次')
-          this.trendMetric('磨牙', '1 次')
-        }
-      } else {
-        Column({ space: 8 }) {
-          Text('暂无趋势')
-            .fontSize(SleepText.headline)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(SleepColor.textSecondary)
-          Text('完成一次睡眠监测后，这里会显示周/月趋势。')
-            .fontSize(SleepText.caption)
-            .fontColor(SleepColor.textTertiary)
-        }
-        .width('100%')
-        .height(150)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
+      this.chartBars()
+      Row({ space: 12 }) {
+        this.trendMetric('平均评分', `${this.historyAverageScore()} 分`)
+        this.trendMetric('平均噪音', `${this.historyAverageDecibels()} dB`)
+        this.trendMetric('噪音事件', `${this.historyEventCount()} 次`)
       }
+      this.historyReportList()
     }
     .padding(16)
     .backgroundColor(SleepColor.secondaryBackground)
@@ -320,14 +312,14 @@ export struct SleepHomePage {
 
   @Builder
   private chartBars() {
-    Row({ space: 8 }) {
-      ForEach([54, 74, 62, 88, 76, 92, 70], (heightValue: number, index: number) => {
+    Row({ space: this.trendRange === 0 ? 8 : 2 }) {
+      ForEach(this.trendScores(), (scoreValue: number, index: number) => {
         Column() {
           Blank()
           Column()
-            .width(16)
-            .height(heightValue)
-            .backgroundColor(index === 5 ? SleepColor.primary : '#C9D2F5')
+            .width(this.trendRange === 0 ? 16 : 6)
+            .height(scoreValue > 0 ? Math.max(16, scoreValue) : 8)
+            .backgroundColor(scoreValue > 0 ? SleepColor.primary : '#E5E9F2')
             .borderRadius(8)
         }
         .height(132)
@@ -358,9 +350,58 @@ export struct SleepHomePage {
   }
 
   @Builder
+  private historyReportList() {
+    Column({ space: 8 }) {
+      Row() {
+        Text(this.trendRange === 0 ? '近 7 天报告' : '近 30 天报告')
+          .fontSize(SleepText.headline)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(SleepColor.textPrimary)
+        Blank()
+        Text(`${this.rangeReports().length} 条`)
+          .fontSize(SleepText.caption)
+          .fontColor(SleepColor.textSecondary)
+      }
+      if (this.rangeReports().length === 0) {
+        Text('当前时间范围内暂无睡眠报告')
+          .fontSize(SleepText.caption)
+          .fontColor(SleepColor.textTertiary)
+          .width('100%')
+          .height(48)
+          .textAlign(TextAlign.Center)
+      } else {
+        ForEach(this.rangeReports(), (item: SleepReportData) => {
+          Row({ space: 10 }) {
+            Column({ space: 3 }) {
+              Text(this.reportDateText(item.endedAt))
+                .fontSize(SleepText.subheadline)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(SleepColor.textPrimary)
+              Text(`${this.durationText(item.durationSeconds)} · ${item.averageDecibels} dB · ${item.events.length} 个事件`)
+                .fontSize(SleepText.caption)
+                .fontColor(SleepColor.textSecondary)
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Text(`${item.score} 分`)
+              .fontSize(SleepText.headline)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(SleepColor.primary)
+          }
+          .width('100%')
+          .padding(12)
+          .backgroundColor(Color.White)
+          .borderRadius(10)
+        }, (item: SleepReportData) => `${item.endedAt}`)
+      }
+    }
+    .width('100%')
+  }
+
+  @Builder
   private reportPanel() {
     Column({ space: 16 }) {
-      Text('示例报告 · 开始睡眠监测后将生成你的专属报告')
+      Text(this.hasActualReport() ? (this.isMonitoring ? '本次声音监测实时分析' : '最近一次声音监测分析') : '示例报告 · 开始睡眠监测后将生成你的专属报告')
         .fontSize(SleepText.caption)
         .fontColor(SleepColor.textSecondary)
         .padding({ left: 10, right: 10, top: 4, bottom: 4 })
@@ -372,7 +413,7 @@ export struct SleepHomePage {
           .fontWeight(FontWeight.Medium)
           .fontColor(SleepColor.textPrimary)
         Blank()
-        Text('86')
+        Text(`${this.effectiveScore()}`)
           .fontSize(24)
           .fontWeight(FontWeight.Bold)
           .fontColor(SleepColor.primary)
@@ -381,14 +422,14 @@ export struct SleepHomePage {
           .fontColor(SleepColor.textSecondary)
       }
       Row({ space: 12 }) {
-        this.reportMetric('时长', '7小时36分')
-        this.reportMetric('平均噪音', '38 dB')
-        this.reportMetric('峰值', '62 dB')
+        this.reportMetric('时长', this.hasActualReport() ? this.durationText(this.actualDurationSeconds()) : '7小时36分')
+        this.reportMetric('平均噪音', `${this.effectiveAverageDecibels()} dB`)
+        this.reportMetric('峰值', `${this.effectivePeakDecibels()} dB`)
       }
       Row({ space: 12 }) {
-        this.reportMetric('睡眠效率', '92%')
-        this.reportMetric('睡眠年龄', '27 岁')
-        this.reportMetric('深睡时长', '142 分钟')
+        this.reportMetric('睡眠效率', `${this.effectiveEfficiency()}%`)
+        this.reportMetric('安静占比', `${this.effectiveQuietPercent()}%`)
+        this.reportMetric('深睡估算', this.hasActualReport() ? this.durationText(this.effectiveDeepSeconds()) : '142 分钟')
       }
       this.recordingControl()
       this.eventList()
@@ -526,9 +567,22 @@ export struct SleepHomePage {
         .fontWeight(FontWeight.Medium)
         .fontColor(SleepColor.textPrimary)
         .width('100%')
-      this.eventRow('打鼾咳嗽', '02:13', '86%')
-      this.eventRow('磨牙', '03:42', '79%')
-      this.eventRow('环境噪音', '04:18', '72%')
+      if (!this.hasActualReport()) {
+        this.eventRow('打鼾咳嗽', '02:13:00', '86%')
+        this.eventRow('磨牙', '03:42:00', '79%')
+        this.eventRow('环境噪音', '04:18:00', '72%')
+      } else if (this.report.events.length === 0) {
+        Text('本次监测未发现明显噪音事件')
+          .fontSize(SleepText.caption)
+          .fontColor(SleepColor.textTertiary)
+          .width('100%')
+          .height(44)
+          .textAlign(TextAlign.Center)
+      } else {
+        ForEach(this.report.events, (event: SleepDetectedEvent) => {
+          this.eventRow(event.title, this.eventTimeText(event.elapsedSeconds), `${event.decibels} dB`)
+        }, (event: SleepDetectedEvent) => `${event.title}-${event.elapsedSeconds}`)
+      }
     }
     .padding(14)
     .backgroundColor(SleepColor.tertiaryBackground)
@@ -536,7 +590,7 @@ export struct SleepHomePage {
   }
 
   @Builder
-  private eventRow(title: string, time: string, confidence: string) {
+  private eventRow(title: string, time: string, value: string) {
     Row({ space: 10 }) {
       Image(this.eventIcon(title))
         .width(20)
@@ -554,7 +608,7 @@ export struct SleepHomePage {
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
-      Text(confidence)
+      Text(value)
         .fontSize(SleepText.caption)
         .fontWeight(FontWeight.Medium)
         .fontColor(SleepColor.textSecondary)
@@ -573,18 +627,14 @@ export struct SleepHomePage {
         .width('100%')
       Row({ space: 16 }) {
         Stack() {
-          DataPanel({
-            values: [31, 48, 15, 6],
-            max: 100,
-            type: DataPanelType.Circle
-          })
+          Canvas(this.ringContext)
             .width(120)
             .height(120)
-            .valueColors([SleepColor.primary, '#80D6FF', '#9B7BFF', '#FFB36B'])
-            .trackBackgroundColor('#EEF2F8')
-            .strokeWidth(18)
-            .closeEffect(true)
-          Text('7.6h')
+            .id(this.stagePercentages().join('-'))
+            .onReady(() => {
+              this.drawSleepRing(this.stagePercentages());
+            })
+          Text(this.hasActualReport() ? this.shortDurationText(this.actualDurationSeconds()) : '7.6h')
             .fontSize(SleepText.headline)
             .fontWeight(FontWeight.Medium)
             .fontColor(SleepColor.textPrimary)
@@ -593,14 +643,16 @@ export struct SleepHomePage {
         .height(120)
 
         Column({ space: 8 }) {
-          this.stageRow('深睡', '142 分钟', '31%', SleepColor.primary)
-          this.stageRow('浅睡', '221 分钟', '48%', '#80D6FF')
-          this.stageRow('做梦', '68 分钟', '15%', '#9B7BFF')
-          this.stageRow('清醒', '27 分钟', '6%', '#FFB36B')
+          this.stageRow('深睡', this.hasActualReport() ? this.durationText(this.effectiveDeepSeconds()) : '142 分钟', this.hasActualReport() ? `${this.stagePercent(this.effectiveDeepSeconds())}%` : '31%', SleepColor.primary)
+          this.stageRow('浅睡', this.hasActualReport() ? this.durationText(this.effectiveLightSeconds()) : '221 分钟', this.hasActualReport() ? `${this.stagePercent(this.effectiveLightSeconds())}%` : '48%', '#80D6FF')
+          this.stageRow('做梦', this.hasActualReport() ? this.durationText(this.effectiveDreamSeconds()) : '68 分钟', this.hasActualReport() ? `${this.stagePercent(this.effectiveDreamSeconds())}%` : '15%', '#9B7BFF')
+          this.stageRow('清醒', this.hasActualReport() ? this.durationText(this.effectiveAwakeSeconds()) : '27 分钟', this.hasActualReport() ? `${this.stagePercent(this.effectiveAwakeSeconds())}%` : '6%', '#FFB36B')
         }
         .layoutWeight(1)
       }
-      Text('深度睡眠 142 分钟（参考值 >90 分钟，已达到健康参考值）。浅睡眠 221 分钟。做梦 68 分钟。睡眠中觉醒约 27 分钟。')
+      Text(this.hasActualReport() ?
+        `根据本次声音强度变化估算：深睡 ${this.durationText(this.effectiveDeepSeconds())}，浅睡 ${this.durationText(this.effectiveLightSeconds())}，做梦 ${this.durationText(this.effectiveDreamSeconds())}，清醒 ${this.durationText(this.effectiveAwakeSeconds())}。睡眠阶段仅供参考。` :
+        '示例：深度睡眠 142 分钟，浅睡眠 221 分钟，做梦 68 分钟，睡眠中清醒约 27 分钟。完成监测后将显示你的真实分析。')
         .fontSize(SleepText.caption)
         .fontColor(SleepColor.textSecondary)
         .lineHeight(20)
@@ -649,7 +701,7 @@ export struct SleepHomePage {
     if (title === '磨牙') {
       return $rawfile('icons_sleep/event_mouth.svg');
     }
-    if (title === '环境噪音') {
+    if (title === '环境噪音' || title === '突发噪音') {
       return $rawfile('icons_sleep/event_speaker.svg');
     }
     if (title === '鼻塞') {
@@ -661,7 +713,203 @@ export struct SleepHomePage {
     return $rawfile('icons_sleep/event_pause.svg');
   }
 
-  private hasSleepData(): boolean {
-    return this.recordingPaths.length > 0;
+  private hasActualReport(): boolean {
+    return this.isMonitoring || this.elapsedSeconds > 0 || this.report.hasData || this.recordingPaths.length > 0;
+  }
+
+  private actualDurationSeconds(): number {
+    return this.isMonitoring ? this.elapsedSeconds : Math.max(this.report.durationSeconds, this.elapsedSeconds);
+  }
+
+  private effectiveScore(): number {
+    return this.hasActualReport() ? Math.max(60, this.report.score) : 86;
+  }
+
+  private effectiveAverageDecibels(): number {
+    if (!this.hasActualReport()) {
+      return 38;
+    }
+    return this.report.averageDecibels > 0 ? this.report.averageDecibels : this.environmentDecibels;
+  }
+
+  private effectivePeakDecibels(): number {
+    if (!this.hasActualReport()) {
+      return 62;
+    }
+    return this.report.peakDecibels > 0 ? this.report.peakDecibels : this.environmentDecibels;
+  }
+
+  private effectiveEfficiency(): number {
+    return this.hasActualReport() ? this.report.efficiency : 92;
+  }
+
+  private effectiveQuietPercent(): number {
+    return this.hasActualReport() ? this.report.quietPercent : 94;
+  }
+
+  private effectiveDeepSeconds(): number {
+    return this.report.hasData ? this.report.deepSeconds : Math.round(this.actualDurationSeconds() * 0.34);
+  }
+
+  private effectiveDreamSeconds(): number {
+    return this.report.hasData ? this.report.dreamSeconds : Math.round(this.actualDurationSeconds() * 0.20);
+  }
+
+  private effectiveAwakeSeconds(): number {
+    return this.report.hasData ? this.report.awakeSeconds : 0;
+  }
+
+  private effectiveLightSeconds(): number {
+    if (this.report.hasData) {
+      return this.report.lightSeconds;
+    }
+    return Math.max(0, this.actualDurationSeconds() - this.effectiveDeepSeconds() - this.effectiveDreamSeconds());
+  }
+
+  private trendScores(): number[] {
+    const reports = this.rangeReports();
+    if (!this.hasActualReport() && reports.length === 0) {
+      return [54, 74, 62, 88, 76, 92, 70];
+    }
+    const dayCount = this.trendRange === 0 ? 7 : 30;
+    const scores: number[] = [];
+    const now = new Date();
+    for (let offset = dayCount - 1; offset >= 0; offset--) {
+      const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset);
+      let score = 0;
+      for (let index = 0; index < reports.length; index++) {
+        const reportDate = new Date(reports[index].endedAt);
+        if (reportDate.getFullYear() === target.getFullYear() &&
+          reportDate.getMonth() === target.getMonth() && reportDate.getDate() === target.getDate()) {
+          score = reports[index].score;
+          break;
+        }
+      }
+      scores.push(score);
+    }
+    return scores;
+  }
+
+  private rangeReports(): SleepReportData[] {
+    const dayCount = this.trendRange === 0 ? 7 : 30;
+    const now = new Date();
+    const rangeStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayCount + 1).getTime();
+    const rangeEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+    return this.reports
+      .filter((item: SleepReportData): boolean =>
+        item.hasData && item.endedAt >= rangeStart && item.endedAt < rangeEnd)
+      .sort((left: SleepReportData, right: SleepReportData): number => right.endedAt - left.endedAt);
+  }
+
+  private historyAverageScore(): number {
+    const reports = this.rangeReports();
+    if (reports.length === 0) {
+      return this.hasActualReport() ? this.effectiveScore() : 86;
+    }
+    return Math.round(reports.reduce((sum: number, item: SleepReportData): number => sum + item.score, 0) / reports.length);
+  }
+
+  private historyAverageDecibels(): number {
+    const reports = this.rangeReports();
+    if (reports.length === 0) {
+      return this.hasActualReport() ? this.effectiveAverageDecibels() : 38;
+    }
+    return Math.round(reports.reduce((sum: number, item: SleepReportData): number => sum + item.averageDecibels, 0) / reports.length);
+  }
+
+  private historyEventCount(): number {
+    const reports = this.rangeReports();
+    if (reports.length === 0) {
+      return this.hasActualReport() ? this.report.events.length : 4;
+    }
+    return reports.reduce((sum: number, item: SleepReportData): number => sum + item.events.length, 0);
+  }
+
+  private reportDateText(timestamp: number): string {
+    const date = new Date(timestamp);
+    return `${date.getFullYear()}-${this.twoDigits(date.getMonth() + 1)}-${this.twoDigits(date.getDate())} ${this.twoDigits(date.getHours())}:${this.twoDigits(date.getMinutes())}`;
+  }
+
+  private durationText(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainSeconds = Math.floor(seconds % 60);
+    if (hours > 0) {
+      return `${hours}小时${minutes}分`;
+    }
+    if (minutes > 0) {
+      return `${minutes}分${remainSeconds}秒`;
+    }
+    return `${remainSeconds}秒`;
+  }
+
+  private shortDurationText(seconds: number): string {
+    if (seconds >= 3600) {
+      return `${(seconds / 3600).toFixed(1)}h`;
+    }
+    if (seconds >= 60) {
+      return `${Math.floor(seconds / 60)}m`;
+    }
+    return `${seconds}s`;
+  }
+
+  private eventTimeText(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainSeconds = Math.floor(seconds % 60);
+    return `${this.twoDigits(hours)}:${this.twoDigits(minutes)}:${this.twoDigits(remainSeconds)}`;
+  }
+
+  private twoDigits(value: number): string {
+    return value < 10 ? `0${value}` : `${value}`;
+  }
+
+  private stagePercent(seconds: number): number {
+    const duration = this.actualDurationSeconds();
+    if (!this.hasActualReport() || duration <= 0) {
+      return 0;
+    }
+    return Math.round(seconds * 100 / duration);
+  }
+
+  private stagePercentages(): number[] {
+    if (!this.hasActualReport()) {
+      return [31, 48, 15, 6];
+    }
+    return [
+      this.stagePercent(this.effectiveDeepSeconds()),
+      this.stagePercent(this.effectiveLightSeconds()),
+      this.stagePercent(this.effectiveDreamSeconds()),
+      this.stagePercent(this.effectiveAwakeSeconds())
+    ];
+  }
+
+  private drawSleepRing(values: number[]): void {
+    const context = this.ringContext;
+    const center = 60;
+    const radius = 48;
+    const lineWidth = 18;
+    context.clearRect(0, 0, 120, 120);
+    context.lineWidth = lineWidth;
+    context.lineCap = 'butt';
+    context.strokeStyle = '#EEF2F8';
+    context.beginPath();
+    context.arc(center, center, radius, 0, Math.PI * 2);
+    context.stroke();
+
+    const colors: string[] = [SleepColor.primary, '#80D6FF', '#9B7BFF', '#FFB36B'];
+    let startAngle = -Math.PI / 2;
+    for (let index = 0; index < values.length; index++) {
+      const portion = Math.max(0, values[index]) / 100;
+      if (portion <= 0) {
+        continue;
+      }
+      const endAngle = startAngle + Math.PI * 2 * portion;
+      context.strokeStyle = colors[index];
+      context.beginPath();
+      context.arc(center, center, radius, startAngle, endAngle);
+      context.stroke();
+      startAngle = endAngle;
+    }
   }
 }

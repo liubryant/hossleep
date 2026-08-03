@@ -22,7 +22,7 @@ import { StoryHomePage } from '../components/stories/StoryHomePage';
 import { RotatingStoryCover } from '../components/stories/RotatingStoryCover';
 import { VipMembershipPage } from '../components/vip/VipMembershipPage';
 import { SOUND_SCENES, STORY_ITEMS } from '../models/SleepData';
-import { SoundSceneItem, StoryListItem } from '../models/SleepModels';
+import { SleepDetectedEvent, SleepReportData, SoundSceneItem, StoryListItem } from '../models/SleepModels';
 import { AppSettings, SavedSettings } from '../services/AppSettings';
 import { AuthService } from '../services/AuthService';
 import { MediaSessionService } from '../services/MediaSessionService';
@@ -38,6 +38,8 @@ import { UmengAnalytics } from '../services/UmengAnalytics';
 struct Index {
   @StorageLink('notificationStoryIndex') @Watch('onNotificationStoryChanged')
   private notificationStoryIndex: number = 0;
+  @StorageLink('quickActionRoute') @Watch('onQuickActionChanged')
+  private quickActionRoute: string = '';
   @State private agreementAccepted: boolean = false;
   @State private agreementChecked: boolean = false;
   @State private activeTab: number = 0;
@@ -70,6 +72,12 @@ struct Index {
   @State private sleepRecordingPath: string = '';
   @State private sleepRecordingPaths: string[] = [];
   @State private sleepRecordingPlaying: boolean = false;
+  @State private sleepReport: SleepReportData = {
+    hasData: false, endedAt: 0, durationSeconds: 0, averageDecibels: 0, peakDecibels: 0,
+    score: 60, efficiency: 0, quietPercent: 0, deepSeconds: 0,
+    lightSeconds: 0, dreamSeconds: 0, awakeSeconds: 0, events: []
+  };
+  @State private sleepReports: SleepReportData[] = [];
   @State private isLoggedIn: boolean = false;
   @State private saveClips: boolean = true;
   @State private sensitivity: number = 65;
@@ -89,6 +97,11 @@ struct Index {
   private storyPlaybackTimer: number = -1;
   private storyClockTimer: number = -1;
   private storyLoadToken: number = 0;
+  // 本地测试期间不限制睡眠报告生成时长；正式发布前恢复为 30 * 60。
+  private minimumSleepReportSeconds: number = 30 * 60;
+  private sleepDecibelSamples: number[] = [];
+  private sleepDetectedEvents: SleepDetectedEvent[] = [];
+  private lastNoiseEventSecond: number = -30;
   private storyCatalog: StoryListItem[] = STORY_ITEMS;
   private storyTextScroller: Scroller = new Scroller();
 
@@ -287,6 +300,8 @@ struct Index {
           recordingPath: this.sleepRecordingPath,
           recordingPaths: this.sleepRecordingPaths,
           isRecordingPlaying: this.sleepRecordingPlaying,
+          report: this.sleepReport,
+          reports: this.sleepReports,
           onSelectPage: (index: number) => {
             this.sleepPage = index;
           },
@@ -1280,6 +1295,26 @@ struct Index {
     this.consumeNotificationStory();
   }
 
+  private onQuickActionChanged(): void {
+    this.consumeQuickAction();
+  }
+
+  private consumeQuickAction(): void {
+    if (!this.agreementAccepted || this.quickActionRoute.length === 0) {
+      return;
+    }
+    const action = this.quickActionRoute;
+    this.quickActionRoute = '';
+    this.route = 'home';
+    if (action === 'nature') {
+      this.activeTab = 0;
+      this.soundCategory = 5;
+    } else if (action === 'stories') {
+      this.activeTab = 2;
+      this.storyListTab = 0;
+    }
+  }
+
   private consumeNotificationStory(): void {
     const index = this.notificationStoryIndex;
     if (index < 1 || !this.agreementAccepted) {
@@ -1434,6 +1469,13 @@ struct Index {
         this.sleepRecordingPath = '';
         this.sleepRecordingPaths = [];
         this.sleepRecordingPlaying = false;
+        this.sleepReport = {
+          hasData: false, endedAt: 0, durationSeconds: 0, averageDecibels: 0, peakDecibels: 0,
+          score: 60, efficiency: 0, quietPercent: 0, deepSeconds: 0,
+          lightSeconds: 0, dreamSeconds: 0, awakeSeconds: 0, events: []
+        };
+        this.sleepReports = [];
+        AppSettings.clearSleepReport(this.context());
         promptAction.showToast({ message: '本地睡眠录音和缓存数据已清除' });
       });
     } else if (action === 'microphone') {
@@ -1460,6 +1502,8 @@ struct Index {
     this.sensitivity = saved.sensitivity * 100;
     this.favoriteSoundIds = saved.favoriteSoundIds;
     this.favoriteStoryIds = saved.favoriteStoryIds;
+    this.sleepReport = saved.sleepReport;
+    this.sleepReports = saved.sleepReports;
   }
 
   private async acceptPrivacyAgreement(): Promise<void> {
@@ -1469,6 +1513,7 @@ struct Index {
     await this.initializeAfterPrivacyConsent();
     await this.loadRemoteStorySwitch();
     this.consumeNotificationStory();
+    this.consumeQuickAction();
   }
 
   private async loadRemoteStorySwitch(): Promise<void> {
@@ -1498,6 +1543,7 @@ struct Index {
       }, 1000);
     }
     setTimeout(() => this.consumeNotificationStory(), 300);
+    setTimeout(() => this.consumeQuickAction(), 300);
   }
 
   private context(): common.UIAbilityContext {
@@ -1578,7 +1624,7 @@ struct Index {
         this.isMonitoring = false;
         this.sleepEnvironmentDecibels = 0;
         this.stopSleepTimer();
-        if (this.sleepElapsedSeconds < 30 * 60) {
+        if (this.sleepElapsedSeconds < this.minimumSleepReportSeconds) {
           SleepRecorder.deleteRecording(path);
           this.sleepRecordingPath = '';
           this.sleepRecordingPaths = SleepRecorder.listRecordings(this.context());
@@ -1587,6 +1633,10 @@ struct Index {
         }
         this.sleepRecordingPath = path;
         this.sleepRecordingPaths = SleepRecorder.listRecordings(this.context());
+        this.sleepReport = this.analyzeSleepSession();
+        this.sleepReports = [this.sleepReport].concat(this.sleepReports).slice(0, 180);
+        this.sleepPage = 1;
+        await AppSettings.setSleepReport(this.context(), this.sleepReport);
         promptAction.showToast({ message: `睡眠录音已保存：${path.substring(path.lastIndexOf('/') + 1)}` });
       } catch (_) {
         this.isMonitoring = false;
@@ -1603,6 +1653,14 @@ struct Index {
         await SleepRecorder.start(this.context());
         this.sleepElapsedSeconds = 0;
         this.sleepEnvironmentDecibels = 0;
+        this.sleepDecibelSamples = [];
+        this.sleepDetectedEvents = [];
+        this.lastNoiseEventSecond = -30;
+        this.sleepReport = {
+          hasData: true, endedAt: 0, durationSeconds: 0, averageDecibels: 0, peakDecibels: 0,
+          score: 60, efficiency: 0, quietPercent: 0, deepSeconds: 0,
+          lightSeconds: 0, dreamSeconds: 0, awakeSeconds: 0, events: []
+        };
         this.isMonitoring = true;
         this.startSleepTimer();
         promptAction.showToast({ message: '睡眠监测已开始，正在录音' });
@@ -1623,9 +1681,24 @@ struct Index {
       SleepRecorder.currentDecibels().then((decibels: number) => {
         if (this.isMonitoring) {
           this.sleepEnvironmentDecibels = decibels;
+          if (decibels > 0) {
+            this.sleepDecibelSamples.push(decibels);
+            if (decibels >= 50 && this.sleepElapsedSeconds - this.lastNoiseEventSecond >= 20) {
+              this.sleepDetectedEvents.push({
+                title: decibels >= 65 ? '突发噪音' : '环境噪音',
+                elapsedSeconds: this.sleepElapsedSeconds,
+                decibels: decibels
+              });
+              this.lastNoiseEventSecond = this.sleepElapsedSeconds;
+            }
+          }
+          this.sleepReport = this.analyzeSleepSession();
         }
       }).catch(() => {
         this.sleepEnvironmentDecibels = 0;
+        if (this.isMonitoring) {
+          this.sleepReport = this.analyzeSleepSession();
+        }
       });
     }, 1000);
   }
@@ -1638,6 +1711,53 @@ struct Index {
     if (!this.isMonitoring) {
       this.sleepEnvironmentDecibels = 0;
     }
+  }
+
+  private analyzeSleepSession(): SleepReportData {
+    const duration = Math.max(this.sleepElapsedSeconds, 0);
+    const calculationDuration = Math.max(duration, 1);
+    const sampleCount = this.sleepDecibelSamples.length;
+    let total = 0;
+    let peak = 0;
+    let noisySamples = 0;
+    this.sleepDecibelSamples.forEach((decibels: number) => {
+      total += decibels;
+      peak = Math.max(peak, decibels);
+      if (decibels >= 50) {
+        noisySamples++;
+      }
+    });
+    const average = sampleCount > 0 ? Math.round(total / sampleCount) : 0;
+    const noiseRatio = sampleCount > 0 ? noisySamples / sampleCount : 0;
+    const awakeSeconds = Math.min(duration, Math.round(duration * Math.min(0.25, noiseRatio * 0.45)));
+    const sleepingSeconds = Math.max(0, duration - awakeSeconds);
+    const deepRatio = Math.max(0.20, 0.34 - noiseRatio * 0.18);
+    const dreamRatio = Math.max(0.14, 0.20 - noiseRatio * 0.06);
+    const deepSeconds = Math.round(sleepingSeconds * deepRatio);
+    const dreamSeconds = Math.round(sleepingSeconds * dreamRatio);
+    const lightSeconds = Math.max(0, sleepingSeconds - deepSeconds - dreamSeconds);
+    const efficiency = duration > 0 ?
+      Math.max(70, Math.min(99, Math.round((sleepingSeconds / calculationDuration) * 100))) : 0;
+    const quietPercent = Math.max(0, Math.min(100, Math.round((1 - noiseRatio) * 100)));
+    const noisePenalty = Math.max(0, average - 35) * 0.7;
+    const peakPenalty = Math.max(0, peak - 60) * 0.25;
+    const eventPenalty = Math.min(15, this.sleepDetectedEvents.length * 1.5);
+    const score = Math.max(60, Math.min(100, Math.round(96 - noisePenalty - peakPenalty - eventPenalty)));
+    return {
+      hasData: true,
+      endedAt: this.isMonitoring ? 0 : Date.now(),
+      durationSeconds: duration,
+      averageDecibels: average,
+      peakDecibels: peak,
+      score: score,
+      efficiency: efficiency,
+      quietPercent: quietPercent,
+      deepSeconds: deepSeconds,
+      lightSeconds: lightSeconds,
+      dreamSeconds: dreamSeconds,
+      awakeSeconds: awakeSeconds,
+      events: this.sleepDetectedEvents.slice()
+    };
   }
 
   @Builder

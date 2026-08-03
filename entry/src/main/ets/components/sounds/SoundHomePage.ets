@@ -33,6 +33,7 @@ export struct SoundHomePage {
   onPlaySound: (scene: SoundSceneItem) => void = () => {};
   onToggleFavorite: (id: string) => void = () => {};
   @State private scenes: SoundSceneItem[] = SOUND_SCENES;
+  @State private searchKeyword: string = '';
 
   aboutToAppear(): void {
     this.loadScenes();
@@ -217,9 +218,18 @@ export struct SoundHomePage {
         .height(19)
         .fillColor(SleepColor.textSecondary)
 
-      Text('搜索雨声、森林、海浪')
+      TextInput({ text: this.searchKeyword, placeholder: '搜索雨声、森林、海浪' })
         .fontSize(SleepText.subheadline)
-        .fontColor(SleepColor.textTertiary)
+        .fontColor(SleepColor.textPrimary)
+        .placeholderColor(SleepColor.textTertiary)
+        .caretColor(SleepColor.textPrimary)
+        .backgroundColor(Color.Transparent)
+        .border({ width: 0 })
+        .padding(0)
+        .layoutWeight(1)
+        .onChange((value: string) => {
+          this.searchKeyword = value;
+        })
     }
     .height(40)
     .width('100%')
@@ -316,14 +326,23 @@ export struct SoundHomePage {
   }
 
   private displayedScenes(): SoundSceneItem[] {
+    let result: SoundSceneItem[];
     if (this.selectedCategory === 2) {
-      return this.scenes.filter((scene: SoundSceneItem): boolean => this.favoriteSoundIds.includes(scene.id));
+      result = this.scenes.filter((scene: SoundSceneItem): boolean => this.favoriteSoundIds.includes(scene.id));
+    } else if (this.selectedCategory === 0 || this.selectedCategory === 1) {
+      result = this.scenes;
+    } else {
+      const category = SOUND_CATEGORIES[this.selectedCategory];
+      result = this.scenes.filter((scene: SoundSceneItem): boolean => scene.category === category);
     }
-    if (this.selectedCategory === 0 || this.selectedCategory === 1) {
-      return this.scenes;
+    const keyword = this.searchKeyword.trim().toLowerCase();
+    if (keyword.length === 0) {
+      return result;
     }
-    const category = SOUND_CATEGORIES[this.selectedCategory];
-    return this.scenes.filter((scene: SoundSceneItem): boolean => scene.category === category);
+    return result.filter((scene: SoundSceneItem): boolean =>
+      scene.title.toLowerCase().includes(keyword) ||
+      scene.subtitle.toLowerCase().includes(keyword) ||
+      scene.category.toLowerCase().includes(keyword));
   }
 
   private categoryWidth(title: string): number {

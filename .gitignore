@@ -1,32 +1,46 @@
-# HarmonyOS / Hvigor build outputs
+# Operating system metadata
+.DS_Store
+**/.DS_Store
+Thumbs.db
+Desktop.ini
+
+# DevEco Studio / IntelliJ local settings
+.idea/
+*.iml
+local.properties
+
+# HarmonyOS build system caches and reports
 .hvigor/
-**/build/
+**/.hvigor/
 **/.cxx/
 
-# Installed dependencies
+# Installed dependencies (restore with ohpm install)
 oh_modules/
 **/oh_modules/
 node_modules/
 **/node_modules/
 
-# Local SDK and machine-specific settings
-local.properties
-
-# IDE metadata
-.idea/
-*.iml
-
-# Generated application packages and libraries
+# Build outputs, generated code, symbols and signed packages
+build/
+**/build/
 *.hap
-*.har
 *.app
+*.hsp
+*.har
 
-# Logs and temporary files
+# Signing certificates and private key stores
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.p7b
+*.cer
+*.pem
+*.key
+
+# Runtime and editor temporary files
 *.log
 *.tmp
 *.temp
-
-# Operating system metadata
-.DS_Store
-Thumbs.db
-Desktop.ini
+*.swp
+*~

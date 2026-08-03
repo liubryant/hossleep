@@ -3,6 +3,7 @@
  */
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { SleepReportData } from '../models/SleepModels';
 
 const STORE_NAME: string = 'app_settings';
 
@@ -18,6 +19,8 @@ export interface SavedSettings {
   storyReminderEnabled: boolean;
   storyReminderAsked: boolean;
   sleepSensitiveConsent: boolean;
+  sleepReport: SleepReportData;
+  sleepReports: SleepReportData[];
 }
 
 export class AppSettings {
@@ -37,6 +40,22 @@ export class AppSettings {
     } catch (_) {
       favoriteStoryIds = [];
     }
+    const reportJson = await store.get('sleep.latestReport', '') as string;
+    let sleepReport: SleepReportData = AppSettings.emptySleepReport();
+    if (reportJson.length > 0) {
+      try {
+        sleepReport = JSON.parse(reportJson) as SleepReportData;
+      } catch (_) {
+        sleepReport = AppSettings.emptySleepReport();
+      }
+    }
+    const reportsJson = await store.get('sleep.reportHistory', '[]') as string;
+    let sleepReports: SleepReportData[] = [];
+    try {
+      sleepReports = JSON.parse(reportsJson) as SleepReportData[];
+    } catch (_) {
+      sleepReports = [];
+    }
     return {
       agreementAccepted: await store.get('agreement_accepted', false) as boolean,
       isLoggedIn: await store.get('profile.isLoggedIn', false) as boolean,
@@ -48,7 +67,9 @@ export class AppSettings {
       favoriteStoryIds: favoriteStoryIds,
       storyReminderEnabled: await store.get('notifications.storyReminderEnabled', false) as boolean,
       storyReminderAsked: await store.get('notifications.storyReminderAsked', false) as boolean,
-      sleepSensitiveConsent: await store.get('privacy.sleepSensitiveConsent', false) as boolean
+      sleepSensitiveConsent: await store.get('privacy.sleepSensitiveConsent', false) as boolean,
+      sleepReport: sleepReport,
+      sleepReports: sleepReports
     };
   }
 
@@ -105,6 +126,40 @@ export class AppSettings {
 
   static async acceptSleepSensitiveConsent(context: common.UIAbilityContext): Promise<void> {
     await AppSettings.write(context, 'privacy.sleepSensitiveConsent', true);
+  }
+
+  static async setSleepReport(context: common.UIAbilityContext, report: SleepReportData): Promise<void> {
+    const store = await preferences.getPreferences(context, STORE_NAME);
+    const reportsJson = await store.get('sleep.reportHistory', '[]') as string;
+    let reports: SleepReportData[] = [];
+    try {
+      reports = JSON.parse(reportsJson) as SleepReportData[];
+    } catch (_) {
+      reports = [];
+    }
+    reports.push(report);
+    reports = reports
+      .filter((item: SleepReportData): boolean => item.hasData && item.endedAt > 0)
+      .sort((left: SleepReportData, right: SleepReportData): number => right.endedAt - left.endedAt)
+      .slice(0, 180);
+    await store.put('sleep.latestReport', JSON.stringify(report));
+    await store.put('sleep.reportHistory', JSON.stringify(reports));
+    await store.flush();
+  }
+
+  static async clearSleepReport(context: common.UIAbilityContext): Promise<void> {
+    const store = await preferences.getPreferences(context, STORE_NAME);
+    await store.put('sleep.latestReport', '');
+    await store.put('sleep.reportHistory', '[]');
+    await store.flush();
+  }
+
+  private static emptySleepReport(): SleepReportData {
+    return {
+      hasData: false, endedAt: 0, durationSeconds: 0, averageDecibels: 0, peakDecibels: 0,
+      score: 60, efficiency: 0, quietPercent: 0, deepSeconds: 0,
+      lightSeconds: 0, dreamSeconds: 0, awakeSeconds: 0, events: []
+    };
   }
 
   private static async write(context: common.UIAbilityContext, key: string,

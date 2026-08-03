@@ -1,0 +1,34 @@
+{
+  "shortcuts": [
+    {
+      "shortcutId": "listen_nature",
+      "label": "$string:shortcut_listen_nature",
+      "icon": "$media:shortcut_nature",
+      "wants": [
+        {
+          "bundleName": "hm.cjym.timesleep",
+          "moduleName": "entry",
+          "abilityName": "EntryAbility",
+          "parameters": {
+            "quickAction": "nature"
+          }
+        }
+      ]
+    },
+    {
+      "shortcutId": "listen_stories",
+      "label": "$string:shortcut_listen_stories",
+      "icon": "$media:shortcut_story",
+      "wants": [
+        {
+          "bundleName": "hm.cjym.timesleep",
+          "moduleName": "entry",
+          "abilityName": "EntryAbility",
+          "parameters": {
+            "quickAction": "stories"
+          }
+        }
+      ]
+    }
+  ]
+}

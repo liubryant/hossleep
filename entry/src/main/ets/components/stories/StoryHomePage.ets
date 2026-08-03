@@ -111,8 +111,9 @@ export struct StoryHomePage {
         .fontSize(SleepText.subheadline)
         .fontColor(SleepColor.textPrimary)
         .placeholderColor(SleepColor.textTertiary)
-        .caretColor(SleepColor.primary)
+        .caretColor(SleepColor.textPrimary)
         .backgroundColor(Color.Transparent)
+        .border({ width: 0 })
         .padding(0)
         .layoutWeight(1)
         .onChange((value: string) => {

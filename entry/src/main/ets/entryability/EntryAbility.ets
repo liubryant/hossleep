@@ -11,11 +11,14 @@ const DOMAIN = 0x0000;
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     hilog.info(DOMAIN, 'hossleep', '%{public}s', 'Ability onCreate');
+    AppStorage.setOrCreate('quickActionRoute', '');
     this.handleNotificationWant(want);
+    this.handleQuickActionWant(want);
   }
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.handleNotificationWant(want);
+    this.handleQuickActionWant(want);
   }
 
   onDestroy(): void {
@@ -66,6 +69,13 @@ export default class EntryAbility extends UIAbility {
       AppStorage.setOrCreate('notificationStoryIndex', value);
     } else {
       AppStorage.setOrCreate('notificationStoryIndex', 0);
+    }
+  }
+
+  private handleQuickActionWant(want: Want): void {
+    const action = want.parameters?.quickAction;
+    if (action === 'nature' || action === 'stories') {
+      AppStorage.setOrCreate('quickActionRoute', action);
     }
   }
 }

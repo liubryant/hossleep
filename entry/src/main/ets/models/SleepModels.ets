@@ -34,6 +34,28 @@ export interface SleepEventSummaryItem {
   count: number;
 }
 
+export interface SleepDetectedEvent {
+  title: string;
+  elapsedSeconds: number;
+  decibels: number;
+}
+
+export interface SleepReportData {
+  hasData: boolean;
+  endedAt: number;
+  durationSeconds: number;
+  averageDecibels: number;
+  peakDecibels: number;
+  score: number;
+  efficiency: number;
+  quietPercent: number;
+  deepSeconds: number;
+  lightSeconds: number;
+  dreamSeconds: number;
+  awakeSeconds: number;
+  events: SleepDetectedEvent[];
+}
+
 export interface ProfileRowItem {
   title: string;
   value: string;
