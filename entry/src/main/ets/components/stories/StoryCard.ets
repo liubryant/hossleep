@@ -15,13 +15,13 @@ export struct StoryCard {
   onFavorite: () => void = () => {};
 
   build() {
-    Column({ space: 10 }) {
+    Column({ space: 6 }) {
       Stack({ alignContent: Alignment.TopEnd }) {
         StoryCoverImage({
           index: this.story.index,
           coverFile: this.story.coverFile ?? '',
           widthValue: '100%',
-          heightValue: 126,
+          heightValue: 120,
           radius: SleepRadius.card
         })
 
@@ -43,13 +43,13 @@ export struct StoryCard {
         })
       }
       .width('100%')
-      .height(126)
+      .height(120)
 
       Row({ space: 8 }) {
         Column({ space: 2 }) {
           Text(this.displayTitle())
             .fontFamily('MiSans')
-            .fontSize(SleepText.headline)
+            .fontSize(14)
             .fontWeight(FontWeight.Medium)
             .fontColor(SleepColor.textPrimary)
             .textAlign(TextAlign.Start)
@@ -69,12 +69,12 @@ export struct StoryCard {
         }
       }
       .width('100%')
-      .height(40)
+      .height(34)
       .alignItems(VerticalAlign.Center)
     }
-    .padding(10)
+    .padding(8)
     .width('100%')
-    .height(186)
+    .height(176)
     .backgroundColor(SleepColor.secondaryBackground)
     .borderRadius(SleepRadius.card)
     .onClick(() => {

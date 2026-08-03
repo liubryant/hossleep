@@ -6,6 +6,7 @@ export struct ConfirmDialog {
   message: string = '';
   confirmText: string = '确定';
   destructive: boolean = false;
+  showCancel: boolean = true;
   onConfirm: () => void = () => {};
   onCancel: () => void = () => {};
 
@@ -31,19 +32,21 @@ export struct ConfirmDialog {
           .width('100%')
 
         Row({ space: 12 }) {
-          Row() {
-            Text('取消')
-              .fontSize(SleepText.body)
-              .fontColor(SleepColor.textPrimary)
-              .textAlign(TextAlign.Center)
+          if (this.showCancel) {
+            Row() {
+              Text('取消')
+                .fontSize(SleepText.body)
+                .fontColor(SleepColor.textPrimary)
+                .textAlign(TextAlign.Center)
+            }
+            .layoutWeight(1)
+            .height(46)
+            .justifyContent(FlexAlign.Center)
+            .alignItems(VerticalAlign.Center)
+            .backgroundColor(SleepColor.secondaryBackground)
+            .borderRadius(SleepRadius.card)
+            .onClick(this.onCancel)
           }
-          .layoutWeight(1)
-          .height(46)
-          .justifyContent(FlexAlign.Center)
-          .alignItems(VerticalAlign.Center)
-          .backgroundColor(SleepColor.secondaryBackground)
-          .borderRadius(SleepRadius.card)
-          .onClick(this.onCancel)
 
           Row() {
             Text(this.confirmText)

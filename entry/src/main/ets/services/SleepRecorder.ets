@@ -11,6 +11,7 @@ export class SleepRecorder {
   private static playbackFile: fs.File | undefined = undefined;
   private static playbackPath: string = '';
   private static playbackPlaying: boolean = false;
+  private static smoothedDecibels: number = 0;
 
   static async start(context: common.UIAbilityContext): Promise<string> {
     await SleepRecorder.cancel();
@@ -40,6 +41,7 @@ export class SleepRecorder {
     };
     await recorder.prepare(config);
     await recorder.start();
+    SleepRecorder.smoothedDecibels = 0;
     return SleepRecorder.outputPath;
   }
 
@@ -55,14 +57,28 @@ export class SleepRecorder {
       SleepRecorder.recordFile = undefined;
     }
     SleepRecorder.outputPath = '';
+    SleepRecorder.smoothedDecibels = 0;
     return savedPath;
   }
 
-  static async getMaxAmplitude(): Promise<number> {
+  static async currentDecibels(): Promise<number> {
     if (!SleepRecorder.recorder) {
       return 0;
     }
-    return await SleepRecorder.recorder.getAudioCapturerMaxAmplitude();
+    const amplitude = await SleepRecorder.recorder.getAudioCapturerMaxAmplitude();
+    if (amplitude <= 0) {
+      return 0;
+    }
+    // AVRecorder 返回峰值振幅而非声压级。峰值直接套用 RMS 的 +90 dB
+    // 基准会让安静房间虚高到 70 dB 左右，因此使用设备经验曲线校准。
+    const calibrated = 50 * Math.log(amplitude / 32767) / Math.LN10 + 85;
+    const decibels = Math.max(20, Math.min(90, calibrated));
+    if (SleepRecorder.smoothedDecibels <= 0) {
+      SleepRecorder.smoothedDecibels = decibels;
+    } else {
+      SleepRecorder.smoothedDecibels = SleepRecorder.smoothedDecibels * 0.72 + decibels * 0.28;
+    }
+    return Math.round(SleepRecorder.smoothedDecibels);
   }
 
   static async cancel(): Promise<void> {
@@ -78,6 +94,7 @@ export class SleepRecorder {
       SleepRecorder.recordFile = undefined;
     }
     SleepRecorder.outputPath = '';
+    SleepRecorder.smoothedDecibels = 0;
   }
 
   static async togglePlayback(path: string): Promise<boolean> {

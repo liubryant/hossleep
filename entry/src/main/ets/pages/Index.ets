@@ -29,9 +29,7 @@ import { MediaSessionService } from '../services/MediaSessionService';
 import { RemoteContentConfig } from '../services/RemoteContentConfig';
 import { SoundPlayer } from '../services/SoundPlayer';
 import { SleepRecorder } from '../services/SleepRecorder';
-import { SleepReport, SleepReportStore } from '../services/SleepReportStore';
 import { StoryCatalog } from '../services/StoryCatalog';
-import { StoryNotificationService } from '../services/StoryNotificationService';
 import { StorySpeaker } from '../services/StorySpeaker';
 import { UmengAnalytics } from '../services/UmengAnalytics';
 
@@ -51,9 +49,6 @@ struct Index {
   @State private soundDownloadProgress: number = -1;
   @State private favoriteSoundIds: string[] = [];
   @State private favoriteStoryIds: string[] = [];
-  @State private storyReminderEnabled: boolean = false;
-  @State private storyReminderAsked: boolean = false;
-  @State private sleepSensitiveConsent: boolean = false;
   @State private storySwitch: number = 0;
   @State private storyListTab: number = 0;
   @State private storyAllScrollOffset: number = 0;
@@ -71,12 +66,10 @@ struct Index {
   @State private trendRange: number = 0;
   @State private isMonitoring: boolean = false;
   @State private sleepElapsedSeconds: number = 0;
+  @State private sleepEnvironmentDecibels: number = 0;
   @State private sleepRecordingPath: string = '';
   @State private sleepRecordingPaths: string[] = [];
   @State private sleepRecordingPlaying: boolean = false;
-  @State private sleepReports: SleepReport[] = [];
-  @State private currentNoiseDbfs: number = 0;
-  @State private hasCurrentNoise: boolean = false;
   @State private isLoggedIn: boolean = false;
   @State private saveClips: boolean = true;
   @State private sensitivity: number = 65;
@@ -93,10 +86,6 @@ struct Index {
   @State private securityBusy: boolean = false;
   @State private vipSoundPromptVisible: boolean = false;
   private sleepTimer: number = -1;
-  private sleepStartedAt: number = 0;
-  private sleepNoiseTotal: number = 0;
-  private sleepNoiseSamples: number = 0;
-  private sleepNoisePeak: number = -96;
   private storyPlaybackTimer: number = -1;
   private storyClockTimer: number = -1;
   private storyLoadToken: number = 0;
@@ -293,13 +282,11 @@ struct Index {
           selectedPage: this.sleepPage,
           isMonitoring: this.isMonitoring,
           elapsedSeconds: this.sleepElapsedSeconds,
+          environmentDecibels: this.sleepEnvironmentDecibels,
           trendRange: this.trendRange,
           recordingPath: this.sleepRecordingPath,
           recordingPaths: this.sleepRecordingPaths,
           isRecordingPlaying: this.sleepRecordingPlaying,
-          reports: this.sleepReports,
-          currentNoiseDbfs: this.currentNoiseDbfs,
-          hasCurrentNoise: this.hasCurrentNoise,
           onSelectPage: (index: number) => {
             this.sleepPage = index;
           },
@@ -369,7 +356,6 @@ struct Index {
           isLoggedIn: this.isLoggedIn,
           saveClips: this.saveClips,
           sensitivity: this.sensitivity,
-          storyReminderEnabled: this.storyReminderEnabled,
           userPhone: this.maskPhone(this.phoneNumber),
           isVip: this.isVip,
           onLogin: () => {
@@ -386,9 +372,6 @@ struct Index {
           onSensitivityChange: (value: number) => {
             this.sensitivity = value;
             AppSettings.setSensitivity(this.context(), value / 100);
-          },
-          onToggleStoryReminder: () => {
-            this.toggleStoryReminder();
           },
           onOpenAction: (action: string) => {
             this.openProfileAction(action);
@@ -1375,7 +1358,8 @@ struct Index {
       title: this.dialogTitle(),
       message: this.dialogMessage(),
       confirmText: this.dialogConfirmText(),
-      destructive: this.dialogMode !== 'microphone',
+      destructive: this.dialogMode !== 'microphone' && this.dialogMode !== 'reportTooShort',
+      showCancel: this.dialogMode !== 'reportTooShort',
       onCancel: () => {
         this.dialogMode = '';
       },
@@ -1395,6 +1379,9 @@ struct Index {
     if (this.dialogMode === 'microphone') {
       return '需要麦克风权限';
     }
+    if (this.dialogMode === 'reportTooShort') {
+      return '未生成睡眠报告';
+    }
     return '不同意隐私协议';
   }
 
@@ -1408,6 +1395,9 @@ struct Index {
     if (this.dialogMode === 'microphone') {
       return '睡眠监测需要使用麦克风采集环境声音。音频仅在本机分析，拒绝授权不会影响其他功能。';
     }
+    if (this.dialogMode === 'reportTooShort') {
+      return '本次睡眠时长不足 30 分钟，不会生成睡眠报告。';
+    }
     return '不同意用户协议和隐私政策将无法继续使用时光睡眠。';
   }
 
@@ -1419,6 +1409,9 @@ struct Index {
       return '确认清除';
     }
     if (this.dialogMode === 'microphone') {
+      return '知道了';
+    }
+    if (this.dialogMode === 'reportTooShort') {
       return '知道了';
     }
     return '退出应用';
@@ -1441,12 +1434,11 @@ struct Index {
         this.sleepRecordingPath = '';
         this.sleepRecordingPaths = [];
         this.sleepRecordingPlaying = false;
-        SleepReportStore.clear(this.context()).then(() => {
-          this.sleepReports = [];
-          promptAction.showToast({ message: '本地睡眠录音和报告数据已清除' });
-        });
+        promptAction.showToast({ message: '本地睡眠录音和缓存数据已清除' });
       });
     } else if (action === 'microphone') {
+      return;
+    } else if (action === 'reportTooShort') {
       return;
     } else {
       this.context().terminateSelf();
@@ -1468,9 +1460,6 @@ struct Index {
     this.sensitivity = saved.sensitivity * 100;
     this.favoriteSoundIds = saved.favoriteSoundIds;
     this.favoriteStoryIds = saved.favoriteStoryIds;
-    this.storyReminderEnabled = saved.storyReminderEnabled;
-    this.storyReminderAsked = saved.storyReminderAsked;
-    this.sleepSensitiveConsent = saved.sleepSensitiveConsent;
   }
 
   private async acceptPrivacyAgreement(): Promise<void> {
@@ -1490,7 +1479,6 @@ struct Index {
 
   private async initializeAfterPrivacyConsent(): Promise<void> {
     this.sleepRecordingPaths = SleepRecorder.listRecordings(this.context());
-    this.sleepReports = await SleepReportStore.load(this.context());
     this.storyCatalog = await StoryCatalog.load(this.context());
     await MediaSessionService.initialize(
       this.context(),
@@ -1510,24 +1498,6 @@ struct Index {
       }, 1000);
     }
     setTimeout(() => this.consumeNotificationStory(), 300);
-  }
-
-  private async toggleStoryReminder(): Promise<void> {
-    if (this.storyReminderEnabled) {
-      await StoryNotificationService.disable();
-      this.storyReminderEnabled = false;
-      await AppSettings.setStoryReminderEnabled(this.context(), false);
-      promptAction.showToast({ message: '故事提醒已关闭' });
-      return;
-    }
-    await this.enableStoryReminder();
-  }
-
-  private async enableStoryReminder(): Promise<void> {
-    const enabled = await StoryNotificationService.enable(this.context());
-    this.storyReminderEnabled = enabled;
-    await AppSettings.setStoryReminderEnabled(this.context(), enabled);
-    promptAction.showToast({ message: enabled ? '故事提醒已开启' : '未获得通知权限，故事提醒未开启' });
   }
 
   private context(): common.UIAbilityContext {
@@ -1603,30 +1573,21 @@ struct Index {
   private async toggleMonitoring(): Promise<void> {
     if (this.isMonitoring) {
       try {
-        await this.collectNoiseSample();
-        const endedAt = Date.now();
         const path = await SleepRecorder.stop();
         this.sleepRecordingPlaying = false;
         this.isMonitoring = false;
+        this.sleepEnvironmentDecibels = 0;
         this.stopSleepTimer();
-        const durationSeconds = Math.max(1,
-          Math.round((endedAt - this.sleepStartedAt) / 1000));
-        const hasNoiseData = this.sleepNoiseSamples > 0;
-        const report: SleepReport = {
-          id: `${this.sleepStartedAt}`,
-          startTime: this.sleepStartedAt,
-          endTime: endedAt,
-          durationSeconds: durationSeconds,
-          averageDbfs: hasNoiseData ? this.sleepNoiseTotal / this.sleepNoiseSamples : 0,
-          peakDbfs: hasNoiseData ? this.sleepNoisePeak : 0,
-          hasNoiseData: hasNoiseData,
-          recordingPath: path
-        };
+        if (this.sleepElapsedSeconds < 30 * 60) {
+          SleepRecorder.deleteRecording(path);
+          this.sleepRecordingPath = '';
+          this.sleepRecordingPaths = SleepRecorder.listRecordings(this.context());
+          this.dialogMode = 'reportTooShort';
+          return;
+        }
         this.sleepRecordingPath = path;
         this.sleepRecordingPaths = SleepRecorder.listRecordings(this.context());
-        this.sleepReports = await SleepReportStore.add(this.context(), report);
-        this.sleepPage = 1;
-        promptAction.showToast({ message: '本次睡眠记录和报告已生成' });
+        promptAction.showToast({ message: `睡眠录音已保存：${path.substring(path.lastIndexOf('/') + 1)}` });
       } catch (_) {
         this.isMonitoring = false;
         this.stopSleepTimer();
@@ -1641,12 +1602,7 @@ struct Index {
       try {
         await SleepRecorder.start(this.context());
         this.sleepElapsedSeconds = 0;
-        this.sleepStartedAt = Date.now();
-        this.sleepNoiseTotal = 0;
-        this.sleepNoiseSamples = 0;
-        this.sleepNoisePeak = -96;
-        this.currentNoiseDbfs = 0;
-        this.hasCurrentNoise = false;
+        this.sleepEnvironmentDecibels = 0;
         this.isMonitoring = true;
         this.startSleepTimer();
         promptAction.showToast({ message: '睡眠监测已开始，正在录音' });
@@ -1664,34 +1620,23 @@ struct Index {
     this.stopSleepTimer();
     this.sleepTimer = setInterval(() => {
       this.sleepElapsedSeconds++;
-      this.collectNoiseSample();
+      SleepRecorder.currentDecibels().then((decibels: number) => {
+        if (this.isMonitoring) {
+          this.sleepEnvironmentDecibels = decibels;
+        }
+      }).catch(() => {
+        this.sleepEnvironmentDecibels = 0;
+      });
     }, 1000);
-  }
-
-  private async collectNoiseSample(): Promise<void> {
-    if (!this.isMonitoring) {
-      return;
-    }
-    try {
-      const amplitude = await SleepRecorder.getMaxAmplitude();
-      if (amplitude <= 0) {
-        return;
-      }
-      const normalized = amplitude > 1 ? Math.min(1, amplitude / 32767) : Math.min(1, amplitude);
-      const dbfs = Math.max(-96, Math.min(0, 20 * Math.log10(normalized)));
-      this.currentNoiseDbfs = dbfs;
-      this.hasCurrentNoise = true;
-      this.sleepNoiseTotal += dbfs;
-      this.sleepNoiseSamples++;
-      this.sleepNoisePeak = Math.max(this.sleepNoisePeak, dbfs);
-    } catch (_) {
-    }
   }
 
   private stopSleepTimer(): void {
     if (this.sleepTimer >= 0) {
       clearInterval(this.sleepTimer);
       this.sleepTimer = -1;
+    }
+    if (!this.isMonitoring) {
+      this.sleepEnvironmentDecibels = 0;
     }
   }
 

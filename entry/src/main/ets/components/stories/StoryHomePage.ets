@@ -181,14 +181,14 @@ export struct StoryHomePage {
               }
             })
             .width('100%')
-            .height(186)
+            .height(176)
           }
         }, (story: StoryListItem) => story.id)
       }
       .columnsTemplate('1fr 1fr')
-      .columnsGap(16)
-      .rowsGap(16)
-      .padding({ left: 16, right: 16, top: 8, bottom: 104 })
+      .columnsGap(12)
+      .rowsGap(12)
+      .padding({ left: 12, right: 12, top: 6, bottom: 104 })
       .width('100%')
       .height('100%')
       .scrollBar(BarState.Off)

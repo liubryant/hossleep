@@ -7,14 +7,12 @@ export struct ProfilePage {
   @Prop isLoggedIn: boolean = false;
   @Prop saveClips: boolean = true;
   @Prop sensitivity: number = 65;
-  @Prop storyReminderEnabled: boolean = false;
   @Prop userPhone: string = '';
   @Prop isVip: boolean = false;
   onLogin: () => void = () => {};
   onLogout: () => void = () => {};
   onToggleSaveClips: () => void = () => {};
   onSensitivityChange: (value: number) => void = () => {};
-  onToggleStoryReminder: () => void = () => {};
   onOpenAction: (action: string) => void = () => {};
   @State private accountDialogVisible: boolean = false;
 
@@ -33,7 +31,6 @@ export struct ProfilePage {
 
           this.header()
           this.permissionCard()
-          this.reminderCard()
           this.monitorCard()
           this.dataCard()
           this.linkSection('关于', PROFILE_ABOUT_ROWS)
@@ -141,7 +138,7 @@ export struct ProfilePage {
           .height(64)
           .linearGradient({
             angle: 135,
-            colors: [['#7657F5', 0], ['#C65FD0', 1]] as [string, number][]
+            colors: [['#1677FF', 0], ['#66B2FF', 1]] as [string, number][]
           })
           .borderRadius(32)
 
@@ -178,7 +175,7 @@ export struct ProfilePage {
         .textAlign(TextAlign.Center)
         .linearGradient({
           angle: 0,
-          colors: [['#7658F7', 0], ['#A64EE4', 1]] as [string, number][]
+          colors: [['#1677FF', 0], ['#4C9AFF', 1]] as [string, number][]
         })
         .borderRadius(19)
         .hitTestBehavior(HitTestMode.Block)
@@ -194,8 +191,8 @@ export struct ProfilePage {
     .height(116)
     .padding({ left: 18, right: 18 })
     .alignItems(VerticalAlign.Center)
-    .backgroundColor('#EEE7FF')
-    .border({ width: 1, color: '#286750F5' })
+    .backgroundColor('#EAF3FF')
+    .border({ width: 1, color: '#263392FF' })
     .borderRadius(24)
     .onClick(() => {
       if (this.isLoggedIn) {
@@ -224,42 +221,6 @@ export struct ProfilePage {
       }
       .width('100%')
       .height(54)
-      .padding({ left: 16, right: 16 })
-      .backgroundColor(Color.White)
-      .borderRadius(12)
-    }
-    .alignItems(HorizontalAlign.Start)
-  }
-
-  @Builder
-  private reminderCard() {
-    Column({ space: 9 }) {
-      this.sectionTitle('提醒')
-      Row({ space: 10 }) {
-        Text('♫')
-          .fontFamily('MiSans-DemiBold')
-          .fontSize(18)
-          .fontColor(SleepColor.primary)
-          .width(22)
-          .textAlign(TextAlign.Center)
-        Column({ space: 3 }) {
-          Text('故事提醒')
-            .fontFamily('MiSans')
-            .fontSize(15)
-            .fontColor(SleepColor.textPrimary)
-          Text('每天 11:00、16:00、20:00 精选故事')
-            .fontFamily('MiSans')
-            .fontSize(11)
-            .fontColor(SleepColor.textSecondary)
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Toggle({ type: ToggleType.Switch, isOn: this.storyReminderEnabled })
-          .selectedColor(SleepColor.primary)
-          .onChange(() => this.onToggleStoryReminder())
-      }
-      .width('100%')
-      .height(62)
       .padding({ left: 16, right: 16 })
       .backgroundColor(Color.White)
       .borderRadius(12)
