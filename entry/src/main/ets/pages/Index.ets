@@ -30,6 +30,7 @@ import { MINDFULNESS_ITEMS, MindfulnessItem } from '../models/MindfulnessData';
 import { AppSettings, SavedSettings } from '../services/AppSettings';
 import { AuthService } from '../services/AuthService';
 import { MediaSessionService } from '../services/MediaSessionService';
+import { MindfulnessPlayer } from '../services/MindfulnessPlayer';
 import { RemoteContentConfig } from '../services/RemoteContentConfig';
 import { SoundPlayer } from '../services/SoundPlayer';
 import { SleepRecorder } from '../services/SleepRecorder';
@@ -55,6 +56,8 @@ struct Index {
   @State private currentSound: SoundSceneItem = SOUND_SCENES[0];
   @State private allSoundScenes: SoundSceneItem[] = SOUND_SCENES;
   @State private mindfulnessItem: MindfulnessItem = MINDFULNESS_ITEMS[0];
+  @State private activeMindfulnessId: string = '';
+  @State private mindfulnessPlaying: boolean = false;
   @State private downloadingSoundId: string = '';
   @State private soundDownloadProgress: number = -1;
   @State private favoriteSoundIds: string[] = [];
@@ -208,6 +211,20 @@ struct Index {
       } else if (this.route === 'mindfulnessPlayer') {
         MindfulnessPlayerPage({
           item: this.mindfulnessItem,
+          onPlaybackChanged: (playing: boolean) => {
+            this.mindfulnessPlaying = playing;
+            if (playing) {
+              MediaSessionService.showMindfulness(
+                this.mindfulnessItem.id,
+                this.mindfulnessItem.title,
+                this.mindfulnessItem.subtitle,
+                this.mindfulnessItem.cover,
+                true
+              );
+            } else {
+              MediaSessionService.setPlaying(false);
+            }
+          },
           onBack: () => {
             this.route = 'mindfulnessHome';
             this.setStoryImmersiveMode(false);
@@ -282,8 +299,9 @@ struct Index {
 
   @Builder
   private homeShell() {
-    Stack({ alignContent: Alignment.Top }) {
-      SoundHomePage({
+    Stack({ alignContent: Alignment.Bottom }) {
+      Stack({ alignContent: Alignment.Top }) {
+        SoundHomePage({
           selectedCategory: this.soundCategory,
           activeSoundId: this.activeStoryIndex >= 0 ? '' : this.activeSoundId,
           downloadingSoundId: this.downloadingSoundId,
@@ -300,9 +318,14 @@ struct Index {
           },
           onOpenMeditation: (item: MindfulnessItem) => {
             SoundPlayer.stop(this.context());
+            StorySpeaker.stop();
             this.soundPlaying = false;
+            this.storyPlaying = false;
+            this.activeStoryIndex = -1;
             this.activeSoundId = '';
             this.mindfulnessItem = item;
+            this.activeMindfulnessId = item.id;
+            this.mindfulnessPlaying = true;
             this.route = 'mindfulnessPlayer';
             this.setStoryImmersiveMode(true);
           },
@@ -325,6 +348,9 @@ struct Index {
               promptAction.showToast({ message: '当前声音正在下载，请稍候' });
               return;
             }
+            MindfulnessPlayer.stop(this.context());
+            this.activeMindfulnessId = '';
+            this.mindfulnessPlaying = false;
             this.currentSound = scene;
             this.activeSoundId = scene.id;
             const wasDownloading = !scene.isBundledAudio && !SoundPlayer.isCached(this.context(), scene);
@@ -355,9 +381,9 @@ struct Index {
         .width('100%')
         .height('100%')
         .align(Alignment.Top)
-        .visibility(this.activeTab === 0 ? Visibility.Visible : Visibility.Hidden)
+          .visibility(this.activeTab === 0 ? Visibility.Visible : Visibility.Hidden)
 
-      SleepHomePage({
+        SleepHomePage({
           selectedPage: this.sleepPage,
           isMonitoring: this.isMonitoring,
           elapsedSeconds: this.sleepElapsedSeconds,
@@ -389,9 +415,9 @@ struct Index {
               });
           }
         })
-        .visibility(this.activeTab === 1 ? Visibility.Visible : Visibility.Hidden)
+          .visibility(this.activeTab === 1 ? Visibility.Visible : Visibility.Hidden)
 
-      StoryHomePage({
+        StoryHomePage({
           activeStoryId: this.activeStoryIndex > 0 ? this.activeStory.id : '',
           favoriteStoryIds: this.favoriteStoryIds,
           selectedTab: this.storyListTab,
@@ -421,6 +447,9 @@ struct Index {
             }
           },
           onOpenStory: (story: StoryListItem) => {
+            MindfulnessPlayer.stop(this.context());
+            this.activeMindfulnessId = '';
+            this.mindfulnessPlaying = false;
             SoundPlayer.stop(this.context());
             this.soundPlaying = false;
             this.activeStoryIndex = story.index;
@@ -431,9 +460,9 @@ struct Index {
             this.openStory(story.index);
           }
         })
-        .visibility(this.activeTab === 2 ? Visibility.Visible : Visibility.Hidden)
+          .visibility(this.activeTab === 2 ? Visibility.Visible : Visibility.Hidden)
 
-      ProfilePage({
+        ProfilePage({
           isLoggedIn: this.isLoggedIn,
           saveClips: this.saveClips,
           sensitivity: this.sensitivity,
@@ -458,9 +487,12 @@ struct Index {
             this.openProfileAction(action);
           }
         })
-        .visibility(this.activeTab === 3 ? Visibility.Visible : Visibility.Hidden)
+          .visibility(this.activeTab === 3 ? Visibility.Visible : Visibility.Hidden)
+      }
+      .width('100%')
+      .height('100%')
 
-      if (this.activeSoundId.length > 0 || this.activeStoryIndex > 0) {
+      if (this.activeMindfulnessId.length > 0 || this.activeSoundId.length > 0 || this.activeStoryIndex > 0) {
         this.miniPlayer()
       }
 
@@ -470,7 +502,6 @@ struct Index {
           this.activeTab = index;
         }
       })
-      .align(Alignment.Bottom)
     }
     .width('100%')
     .height('100%')
@@ -485,9 +516,14 @@ struct Index {
       onBack: () => this.route = 'home',
       onOpenMeditation: (item: MindfulnessItem) => {
         SoundPlayer.stop(this.context());
+        StorySpeaker.stop();
         this.soundPlaying = false;
+        this.storyPlaying = false;
+        this.activeStoryIndex = -1;
         this.activeSoundId = '';
         this.mindfulnessItem = item;
+        this.activeMindfulnessId = item.id;
+        this.mindfulnessPlaying = true;
         this.route = 'mindfulnessPlayer';
         this.setStoryImmersiveMode(true);
       },
@@ -496,6 +532,9 @@ struct Index {
           promptAction.showToast({ message: '当前声音正在下载，请稍候' });
           return;
         }
+        MindfulnessPlayer.stop(this.context());
+        this.activeMindfulnessId = '';
+        this.mindfulnessPlaying = false;
         this.currentSound = scene;
         this.activeSoundId = scene.id;
         const downloading = !scene.isBundledAudio && !SoundPlayer.isCached(this.context(), scene);
@@ -521,7 +560,14 @@ struct Index {
   @Builder
   private miniPlayer() {
     Row({ space: 12 }) {
-      if (this.activeStoryIndex > 0) {
+      if (this.activeMindfulnessId.length > 0) {
+        Image(`resource://RAWFILE/${this.mindfulnessItem.cover}`)
+          .width(48)
+          .height(48)
+          .objectFit(ImageFit.Cover)
+          .borderRadius(8)
+          .clip(true)
+      } else if (this.activeStoryIndex > 0) {
         StoryCoverImage({
           index: this.activeStoryIndex,
           coverFile: this.currentStory().coverFile ?? '',
@@ -541,12 +587,14 @@ struct Index {
       }
 
       Column({ space: 4 }) {
-        Text(this.activeStoryIndex > 0 ? this.currentStory().title : this.currentSound.title)
+        Text(this.activeMindfulnessId.length > 0 ? this.mindfulnessItem.title :
+          (this.activeStoryIndex > 0 ? this.currentStory().title : this.currentSound.title))
           .fontSize(16)
           .fontWeight(FontWeight.Medium)
           .fontColor(SleepColor.textPrimary)
           .maxLines(1)
-        Text(this.activeStoryIndex > 0 ? '睡前故事' : '助眠声音')
+        Text(this.activeMindfulnessId.length > 0 ? this.mindfulnessItem.subtitle :
+          (this.activeStoryIndex > 0 ? '睡前故事' : '助眠声音'))
           .fontSize(12)
           .fontColor(SleepColor.textSecondary)
           .maxLines(1)
@@ -555,8 +603,7 @@ struct Index {
       .layoutWeight(1)
 
       Stack() {
-        if ((this.activeStoryIndex > 0 && !this.storyPlaying) ||
-          (this.activeStoryIndex < 0 && !this.soundPlaying)) {
+        if (!this.isMiniPlayerPlaying()) {
           Image($rawfile('icons_sleep/ic_play.svg'))
             .width(17)
             .height(17)
@@ -573,7 +620,12 @@ struct Index {
         .backgroundColor(SleepColor.primary)
         .borderRadius(18)
         .onClick(() => {
-          if (this.activeStoryIndex > 0) {
+          if (this.activeMindfulnessId.length > 0) {
+            MindfulnessPlayer.toggle().then((playing: boolean) => {
+              this.mindfulnessPlaying = playing;
+              MediaSessionService.setPlaying(playing);
+            });
+          } else if (this.activeStoryIndex > 0) {
             StorySpeaker.toggle(this.currentStoryText(), (index: number) => {
               this.updateActiveStoryLine(index);
             }, () => this.handleStoryFinished()).then((playing: boolean) => {
@@ -597,6 +649,12 @@ struct Index {
         .width(30)
         .height(30)
         .onClick(() => {
+          if (this.activeMindfulnessId.length > 0) {
+            MindfulnessPlayer.stop(this.context());
+            this.activeMindfulnessId = '';
+            this.mindfulnessPlaying = false;
+            MediaSessionService.stop();
+          }
           this.activeSoundId = '';
           SoundPlayer.stop(this.context());
           this.soundPlaying = false;
@@ -612,6 +670,16 @@ struct Index {
     .backgroundColor('#F7FFFFFF')
     .borderRadius(16)
     .shadow({ radius: 16, color: '#20000000', offsetY: 6 })
+  }
+
+  private isMiniPlayerPlaying(): boolean {
+    if (this.activeMindfulnessId.length > 0) {
+      return this.mindfulnessPlaying;
+    }
+    if (this.activeStoryIndex > 0) {
+      return this.storyPlaying;
+    }
+    return this.soundPlaying;
   }
 
   @Builder
@@ -1359,7 +1427,12 @@ struct Index {
   }
 
   private handleMediaPlay(): void {
-    if (this.activeStoryIndex > 0 && !this.storyPlaying) {
+    if (this.activeMindfulnessId.length > 0 && !this.mindfulnessPlaying) {
+      MindfulnessPlayer.toggle().then((playing: boolean) => {
+        this.mindfulnessPlaying = playing;
+        MediaSessionService.setPlaying(playing);
+      });
+    } else if (this.activeStoryIndex > 0 && !this.storyPlaying) {
       StorySpeaker.toggle(this.currentStoryText(), (index: number) => {
         this.updateActiveStoryLine(index);
       }, () => this.handleStoryFinished()).then((playing: boolean) => {
@@ -1375,7 +1448,10 @@ struct Index {
   }
 
   private handleMediaPause(): void {
-    if (this.activeStoryIndex > 0 && this.storyPlaying) {
+    if (this.activeMindfulnessId.length > 0 && this.mindfulnessPlaying) {
+      MindfulnessPlayer.toggle();
+      this.mindfulnessPlaying = false;
+    } else if (this.activeStoryIndex > 0 && this.storyPlaying) {
       StorySpeaker.stop();
       this.storyPlaying = false;
     } else if (this.activeSoundId.length > 0 && this.soundPlaying) {
@@ -1416,7 +1492,21 @@ struct Index {
     const action = this.quickActionRoute;
     this.quickActionRoute = '';
     this.route = 'home';
-    if (action === 'nature') {
+    if (action === 'mindfulness') {
+      const randomIndex = Math.floor(Math.random() * MINDFULNESS_ITEMS.length);
+      const item = MINDFULNESS_ITEMS[randomIndex];
+      SoundPlayer.stop(this.context());
+      StorySpeaker.stop();
+      this.soundPlaying = false;
+      this.storyPlaying = false;
+      this.activeStoryIndex = -1;
+      this.activeSoundId = '';
+      this.mindfulnessItem = item;
+      this.activeMindfulnessId = item.id;
+      this.mindfulnessPlaying = true;
+      this.route = 'mindfulnessPlayer';
+      this.setStoryImmersiveMode(true);
+    } else if (action === 'nature') {
       this.activeTab = 0;
       this.soundCategory = 5;
     } else if (action === 'stories') {

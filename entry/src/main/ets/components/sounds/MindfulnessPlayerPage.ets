@@ -7,8 +7,10 @@ import { MindfulnessPlayer } from '../../services/MindfulnessPlayer';
 export struct MindfulnessPlayerPage {
   @Prop item: MindfulnessItem = { id: '', title: '', subtitle: '', cover: '', audio: '', colors: ['#294F57', '#3B686B'] };
   onBack: () => void = () => {};
+  onPlaybackChanged: (playing: boolean) => void = () => {};
   @State private isPlaying: boolean = false;
   @State private isFavorite: boolean = false;
+  @State private favoriteAnimating: boolean = false;
   @State private currentMs: number = 0;
   @State private durationMs: number = 1;
   @State private breathingLarge: boolean = false;
@@ -20,6 +22,7 @@ export struct MindfulnessPlayerPage {
   aboutToAppear(): void {
     MindfulnessPlayer.play(getContext(this) as common.UIAbilityContext, this.item.audio).then(() => {
       this.isPlaying = true;
+      this.onPlaybackChanged(true);
     }).catch(() => promptAction.showToast({ message: '音频加载失败' }));
     this.progressTimer = setInterval(() => {
       this.currentMs = MindfulnessPlayer.currentTime();
@@ -33,7 +36,6 @@ export struct MindfulnessPlayerPage {
     if (this.progressTimer >= 0) clearInterval(this.progressTimer);
     if (this.breathTimer >= 0) clearInterval(this.breathTimer);
     this.clearStopTimer();
-    MindfulnessPlayer.stop(getContext(this) as common.UIAbilityContext);
   }
 
   build() {
@@ -131,7 +133,7 @@ export struct MindfulnessPlayerPage {
       }
 
       Row({ space: 9 }) {
-        this.actionButton(this.isFavorite ? '已收藏' : '收藏', this.isFavorite ? '♥' : '♡', () => this.isFavorite = !this.isFavorite)
+        this.favoriteButton()
         this.timerButton()
         this.actionButton('后退15秒', '↶', () => this.skip(-15000))
         this.actionButton('前进15秒', '↷', () => this.skip(15000))
@@ -148,6 +150,32 @@ export struct MindfulnessPlayerPage {
       Text(title).fontSize(10).fontColor('#D6FFFFFF').maxLines(1)
     }
     .layoutWeight(1).height(62).justifyContent(FlexAlign.Center).backgroundColor('#15FFFFFF').borderRadius(17).onClick(action)
+  }
+
+  @Builder
+  private favoriteButton() {
+    Column({ space: 6 }) {
+      Text(this.isFavorite ? '♥' : '♡')
+        .fontSize(22)
+        .fontColor(this.isFavorite ? '#FF7D91' : Color.White)
+        .scale({
+          x: this.favoriteAnimating ? 1.38 : 1,
+          y: this.favoriteAnimating ? 1.38 : 1
+        })
+        .animation({ duration: 180, curve: Curve.EaseOut })
+      Text(this.isFavorite ? '已收藏' : '收藏')
+        .fontSize(10).fontColor('#D6FFFFFF').maxLines(1)
+    }
+    .layoutWeight(1)
+    .height(62)
+    .justifyContent(FlexAlign.Center)
+    .backgroundColor(this.isFavorite ? '#24FFFFFF' : '#15FFFFFF')
+    .borderRadius(17)
+    .onClick(() => {
+      this.isFavorite = !this.isFavorite;
+      this.favoriteAnimating = true;
+      setTimeout(() => this.favoriteAnimating = false, 180);
+    })
   }
 
   @Builder
@@ -172,7 +200,10 @@ export struct MindfulnessPlayerPage {
   }
 
   private toggle(): void {
-    MindfulnessPlayer.toggle().then((playing: boolean) => this.isPlaying = playing);
+    MindfulnessPlayer.toggle().then((playing: boolean) => {
+      this.isPlaying = playing;
+      this.onPlaybackChanged(playing);
+    });
   }
 
   private skip(delta: number): void {
@@ -189,7 +220,10 @@ export struct MindfulnessPlayerPage {
       if (this.timerRemainingSeconds === 0) {
         this.clearStopTimer();
         if (MindfulnessPlayer.isPlaying()) {
-          MindfulnessPlayer.toggle().then(() => this.isPlaying = false);
+          MindfulnessPlayer.toggle().then(() => {
+            this.isPlaying = false;
+            this.onPlaybackChanged(false);
+          });
         }
         promptAction.showToast({ message: '定时播放已结束' });
       }

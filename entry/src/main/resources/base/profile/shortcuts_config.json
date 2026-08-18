@@ -1,6 +1,21 @@
 {
   "shortcuts": [
     {
+      "shortcutId": "open_mindfulness",
+      "label": "$string:shortcut_mindfulness",
+      "icon": "$media:shortcut_mindfulness",
+      "wants": [
+        {
+          "bundleName": "hm.cjym.timesleep",
+          "moduleName": "entry",
+          "abilityName": "EntryAbility",
+          "parameters": {
+            "quickAction": "mindfulness"
+          }
+        }
+      ]
+    },
+    {
       "shortcutId": "listen_nature",
       "label": "$string:shortcut_listen_nature",
       "icon": "$media:shortcut_nature",

@@ -13,7 +13,8 @@ export class MindfulnessPlayer {
     const player = await media.createAVPlayer();
     MindfulnessPlayer.player = player;
     MindfulnessPlayer.rawPath = rawPath;
-    player.loop = false;
+    // 正念冥想资源采用单曲循环，播放结束后自动从头继续。
+    player.loop = true;
     player.on('stateChange', (state: string) => {
       if (state === 'initialized') {
         player.prepare();
@@ -74,4 +75,3 @@ export class MindfulnessPlayer {
     MindfulnessPlayer.playing = false;
   }
 }
-

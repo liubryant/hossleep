@@ -51,6 +51,17 @@ export class MediaSessionService {
     );
   }
 
+  static async showMindfulness(id: string, title: string, subtitle: string,
+    coverFile: string, playing: boolean): Promise<void> {
+    await MediaSessionService.update(
+      `mindfulness-${id}`,
+      title,
+      subtitle,
+      `resource://RAWFILE/${coverFile}`,
+      playing
+    );
+  }
+
   static async setPlaying(playing: boolean): Promise<void> {
     if (!MediaSessionService.session) {
       return;

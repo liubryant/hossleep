@@ -74,7 +74,7 @@ export default class EntryAbility extends UIAbility {
 
   private handleQuickActionWant(want: Want): void {
     const action = want.parameters?.quickAction;
-    if (action === 'nature' || action === 'stories') {
+    if (action === 'mindfulness' || action === 'nature' || action === 'stories') {
       AppStorage.setOrCreate('quickActionRoute', action);
     }
   }

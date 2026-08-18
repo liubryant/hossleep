@@ -92,17 +92,17 @@ export struct SoundCard {
 
         Column({ space: 4 }) {
           Text(this.scene.title)
-            .fontSize(SleepText.headline)
+            .fontSize(SleepText.subheadline)
             .fontWeight(FontWeight.Medium)
             .fontColor(SleepColor.textPrimary)
             .maxLines(1)
 
           Text(this.scene.subtitle.length === 0 ? '助眠声音' : this.scene.subtitle)
-            .fontSize(SleepText.caption)
+            .fontSize(SleepText.caption2)
             .fontColor(SleepColor.textSecondary)
-            .lineHeight(17)
+            .lineHeight(15)
             .maxLines(2)
-            .height(34)
+            .height(30)
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)

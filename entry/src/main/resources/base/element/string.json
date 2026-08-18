@@ -17,6 +17,10 @@
       "value": "用于睡眠监测时识别打鼾、咳嗽、梦话、磨牙和环境噪音"
     },
     {
+      "name": "shortcut_mindfulness",
+      "value": "正念冥想"
+    },
+    {
       "name": "shortcut_listen_nature",
       "value": "聆听自然"
     },

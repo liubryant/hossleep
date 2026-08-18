@@ -162,8 +162,8 @@ export struct SleepHomePage {
             .fontWeight(FontWeight.Medium)
             .fontColor(Color.White)
         }
-          .width('100%')
-          .height(48)
+          .width('84%')
+          .height(44)
           .justifyContent(FlexAlign.Center)
           .alignItems(VerticalAlign.Center)
           .linearGradient({
@@ -172,7 +172,7 @@ export struct SleepHomePage {
               [['#F43F5E', 0], ['#DC2626', 1]] as [string, number][] :
               [['#3392FF', 0], ['#0868E8', 1]] as [string, number][]
           })
-          .borderRadius(24)
+          .borderRadius(22)
           .shadow({
             radius: 12,
             color: this.isMonitoring ? '#35EF4444' : '#351677FF',

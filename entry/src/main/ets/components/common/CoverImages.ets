@@ -66,6 +66,7 @@ export struct SoundCoverImage {
       .objectFit(ImageFit.Cover)
       .borderRadius(this.radius)
       .clip(true)
+      .syncLoad(true)
   }
 }
 

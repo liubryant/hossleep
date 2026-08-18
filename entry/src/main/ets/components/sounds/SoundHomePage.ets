@@ -22,6 +22,9 @@ interface SoundManifestItem {
   audioFile: string;
 }
 
+// 进程级状态：顶部问候动效仅在应用冷启动后首次进入首页时播放。
+let hasPlayedHeaderAnimation: boolean = false;
+
 @Component
 export struct SoundHomePage {
   @Prop selectedCategory: number = 0;
@@ -38,14 +41,26 @@ export struct SoundHomePage {
   onScenesLoaded: (scenes: SoundSceneItem[]) => void = () => {};
   @State private scenes: SoundSceneItem[] = SOUND_SCENES;
   @State private searchKeyword: string = '';
+  @State private headerVisibleCharacterCount: number = 0;
+  @State private showsSleepGreeting: boolean = true;
+  private didStartHeaderAnimation: boolean = false;
 
   aboutToAppear(): void {
+    if (hasPlayedHeaderAnimation) {
+      this.showsSleepGreeting = false;
+      this.headerVisibleCharacterCount = this.animatedHeaderText().length;
+      this.didStartHeaderAnimation = true;
+    } else {
+      // 在组件生命周期内抢占唯一播放权，避免图片回调或首屏重建重复触发动效。
+      hasPlayedHeaderAnimation = true;
+      this.didStartHeaderAnimation = true;
+      setTimeout(() => this.playHeaderWritingAnimation(), 240);
+    }
     this.loadScenes();
   }
 
   build() {
-    Column({ space: 0 }) {
-      this.topBar()
+    Stack({ alignContent: Alignment.Top }) {
       Scroll() {
         Column({ space: 0 }) {
           this.featureCategories()
@@ -90,11 +105,16 @@ export struct SoundHomePage {
           }
         }
         .width('100%')
-        .width('100%')
+        .constraintSize({ minHeight: '100%' })
+        .justifyContent(FlexAlign.Start)
+        .align(Alignment.Top)
       }
-      .layoutWeight(1)
       .width('100%')
+      .height('100%')
+      .padding({ top: 76 })
       .scrollBar(BarState.Off)
+
+      this.topBar()
     }
     .width('100%')
     .height('100%')
@@ -151,8 +171,8 @@ export struct SoundHomePage {
     Column({ space: 10 }) {
       Row() {
         Column({ space: 2 }) {
-          Text('正念冥想').fontSize(16).fontWeight(FontWeight.Medium).fontColor(SleepColor.textPrimary)
-          Text('跟随声音，把注意力带回当下').fontSize(11).fontColor(SleepColor.textSecondary)
+          Text('正念冥想').fontSize(15).fontWeight(FontWeight.Medium).fontColor(SleepColor.textPrimary)
+          Text('跟随声音，把注意力带回当下').fontSize(10).fontColor(SleepColor.textSecondary)
         }.alignItems(HorizontalAlign.Start)
         Blank()
         Text('更多').fontSize(13).fontColor(SleepColor.primary).onClick(this.onOpenMindfulness)
@@ -162,7 +182,7 @@ export struct SoundHomePage {
           ForEach(MINDFULNESS_ITEMS.slice(0, 6), (item: MindfulnessItem) => {
             Column({ space: 7 }) {
               Image(`resource://RAWFILE/${item.cover}`).width(112).height(148)
-                .objectFit(ImageFit.Cover).borderRadius(12).clip(true)
+                .objectFit(ImageFit.Cover).borderRadius(12).clip(true).syncLoad(true)
               Text(item.title).width(112).fontSize(13).fontWeight(FontWeight.Normal)
                 .fontColor(SleepColor.textPrimary).maxLines(1)
             }.alignItems(HorizontalAlign.Start).onClick(() => this.onOpenMeditation(item))
@@ -175,8 +195,8 @@ export struct SoundHomePage {
   @Builder
   private homeNatureTitle() {
     Column({ space: 2 }) {
-      Text('大自然入眠').fontSize(16).fontWeight(FontWeight.Medium).fontColor(SleepColor.textPrimary)
-      Text('枕着山海风雨，慢慢沉入梦乡').fontSize(11).fontColor(SleepColor.textSecondary)
+      Text('大自然入眠').fontSize(15).fontWeight(FontWeight.Medium).fontColor(SleepColor.textPrimary)
+      Text('枕着山海风雨，慢慢沉入梦乡').fontSize(10).fontColor(SleepColor.textSecondary)
     }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 16, right: 16, top: 8, bottom: 5 })
   }
 
@@ -187,6 +207,7 @@ export struct SoundHomePage {
         Image(icon)
           .width(48)
           .height(48)
+          .syncLoad(true)
       }
       .width(56)
       .height(54)
@@ -211,25 +232,59 @@ export struct SoundHomePage {
   @Builder
   private topBar() {
     Row() {
-      Row({ space: 12 }) {
-        Image($r('app.media.app_icon'))
-          .width(36)
-          .height(36)
-          .borderRadius(9)
+      Image($r('app.media.app_icon'))
+        .width(36)
+        .height(36)
+        .borderRadius(9)
+        .syncLoad(true)
+        .margin({ right: 12 })
 
-        Text(`${this.timeGreeting()}，时光睡眠！`)
-          .fontSize(SleepText.title3)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(SleepColor.textPrimary)
+      Stack({ alignContent: Alignment.Start }) {
+        Row({ space: 0 }) {
+          ForEach('眠友，'.split(''), (character: string, index: number) => {
+            Text(character)
+              .fontFamily('MiSans')
+              .fontSize(22)
+              .fontWeight(FontWeight.Normal)
+              .fontColor(this.headerGradientColor(index, 3))
+          }, (character: string, index: number) => `${character}-${index}`)
+        }
+        .opacity(this.showsSleepGreeting ? 1 : 0)
+        .blur(this.showsSleepGreeting ? 0 : 3)
+        .scale({ x: this.showsSleepGreeting ? 1 : 0.96, y: this.showsSleepGreeting ? 1 : 0.96 })
+        .animation({ duration: 240, curve: Curve.EaseInOut })
+
+        Row({ space: 0 }) {
+          ForEach(this.animatedHeaderText().split(''), (character: string, index: number) => {
+            Text(character)
+              .fontFamily('MiSans')
+              .fontSize(22)
+              .fontWeight(FontWeight.Normal)
+              .fontColor(this.headerGradientColor(index, this.animatedHeaderText().length))
+              .opacity(index < this.headerVisibleCharacterCount ? 1 : 0)
+              .blur(index < this.headerVisibleCharacterCount ? 0 : 3.5)
+              .scale({
+                x: index < this.headerVisibleCharacterCount ? 1 : 0.94,
+                y: index < this.headerVisibleCharacterCount ? 1 : 0.94
+              })
+              .rotate({ angle: index < this.headerVisibleCharacterCount ? 0 : (index % 2 === 0 ? -2.5 : 1.8) })
+              .translate({
+                x: index < this.headerVisibleCharacterCount ? 0 : -3,
+                y: index < this.headerVisibleCharacterCount ? 0 : (index % 3 === 0 ? 4 : 6)
+              })
+              .animation({ duration: 220, curve: Curve.EaseOut })
+          }, (character: string, index: number) => `${character}-${index}`)
+        }
       }
-
-      Blank()
+      .height(38)
+      .layoutWeight(1)
 
       Stack() {
         Image($rawfile('icons_sleep/ic_sliders.svg'))
           .width(21)
           .height(21)
           .fillColor(SleepColor.textPrimary)
+          .syncLoad(true)
       }
       .width(38)
       .height(38)
@@ -242,7 +297,10 @@ export struct SoundHomePage {
       ])
     }
     .width('100%')
+    .height(76)
     .padding({ left: 16, right: 16, top: 22, bottom: 18 })
+    .backgroundColor(SleepColor.background)
+    .zIndex(2)
   }
 
   private timeGreeting(): string {
@@ -262,6 +320,38 @@ export struct SoundHomePage {
     return '夜深了';
   }
 
+  private animatedHeaderText(): string {
+    return `${this.timeGreeting()}，时光睡眠！`;
+  }
+
+  private playHeaderWritingAnimation(): void {
+    const characterCount = this.animatedHeaderText().length;
+    setTimeout(() => {
+      this.showsSleepGreeting = false;
+    }, 520);
+    let delay = 630;
+    for (let count = 1; count <= characterCount; count++) {
+      const visibleCount = count;
+      setTimeout(() => {
+        this.headerVisibleCharacterCount = visibleCount;
+      }, delay);
+      delay += count === 2 || count === 5 || count === 7 ? 130 : 72;
+    }
+  }
+
+  private headerGradientColor(index: number, count: number): string {
+    const palette: string[] = [
+      '#1677FF', '#1D7CFF', '#2482FF', '#2B87FF', '#328CFF', '#3992FF',
+      '#4097FF', '#479CFF', '#4EA2FF', '#55A7FF', '#5DADFF', '#66B2FF'
+    ];
+    if (count <= 1) {
+      return palette[0];
+    }
+    const position = Math.min(palette.length - 1,
+      Math.floor(index * (palette.length - 1) / (count - 1)));
+    return palette[position];
+  }
+
   @Builder
   private searchBar() {
     Row({ space: 8 }) {
@@ -269,6 +359,7 @@ export struct SoundHomePage {
         .width(19)
         .height(19)
         .fillColor(SleepColor.textSecondary)
+        .syncLoad(true)
 
       TextInput({ text: this.searchKeyword, placeholder: '搜索雨声、森林、海浪' })
         .fontSize(SleepText.subheadline)
