@@ -260,7 +260,7 @@ export struct StoryHomePage {
 
   private async loadArticles(): Promise<void> {
     if (!this.articleEnabled) {
-      this.stories = STORY_ITEMS;
+      this.stories = this.shuffledStories(STORY_ITEMS);
       return;
     }
     try {
@@ -269,12 +269,23 @@ export struct StoryHomePage {
         .getRawFileContent('StoryResources/contemporary_articles.json');
       const text = util.TextDecoder.create('utf-8').decodeToString(bytes);
       const articles = JSON.parse(text) as StoryListItem[];
-      this.stories = [...STORY_ITEMS, ...articles];
+      this.stories = this.shuffledStories([...STORY_ITEMS, ...articles]);
       setTimeout(() => {
         this.restoreScrollPositions();
       }, 0);
     } catch (_) {
-      this.stories = STORY_ITEMS;
+      this.stories = this.shuffledStories(STORY_ITEMS);
     }
+  }
+
+  private shuffledStories(items: StoryListItem[]): StoryListItem[] {
+    const result: StoryListItem[] = items.slice();
+    for (let index = result.length - 1; index > 0; index--) {
+      const randomIndex = Math.floor(Math.random() * (index + 1));
+      const temporary = result[index];
+      result[index] = result[randomIndex];
+      result[randomIndex] = temporary;
+    }
+    return result;
   }
 }

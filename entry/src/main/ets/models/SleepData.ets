@@ -91,6 +91,6 @@ export const PROFILE_DATA_ROWS: ProfileRowItem[] = [
 export const PROFILE_ABOUT_ROWS: ProfileRowItem[] = [
   { title: '用户协议', value: '', action: 'userAgreement' },
   { title: '隐私政策', value: '', action: 'privacyPolicy' },
-  { title: '版本', value: '1.0.0', action: '' },
+  { title: '版本', value: '', action: '' },
   { title: '注销账号', value: '', action: 'deleteAccount', destructive: true }
 ];

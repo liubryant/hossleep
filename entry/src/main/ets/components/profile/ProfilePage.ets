@@ -1,4 +1,5 @@
 import { SleepColor, SleepText } from '../../common/SleepDesign';
+import { bundleManager } from '@kit.AbilityKit';
 import { PROFILE_ABOUT_ROWS } from '../../models/SleepData';
 import { ProfileRowItem } from '../../models/SleepModels';
 
@@ -15,6 +16,17 @@ export struct ProfilePage {
   onSensitivityChange: (value: number) => void = () => {};
   onOpenAction: (action: string) => void = () => {};
   @State private accountDialogVisible: boolean = false;
+  @State private appVersion: string = '';
+
+  aboutToAppear(): void {
+    try {
+      this.appVersion = bundleManager.getBundleInfoForSelfSync(
+        bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT
+      ).versionName;
+    } catch (_) {
+      this.appVersion = '';
+    }
+  }
 
   build() {
     Stack() {
@@ -327,8 +339,8 @@ export struct ProfilePage {
               .fontSize(15)
               .fontColor(row.destructive ? SleepColor.destructive : SleepColor.textPrimary)
             Blank()
-            if (row.value.length > 0) {
-              Text(row.value)
+            if (row.value.length > 0 || row.title === '版本') {
+              Text(row.title === '版本' && this.appVersion.length > 0 ? this.appVersion : row.value)
                 .fontFamily('MiSans')
                 .fontSize(14)
                 .fontColor(SleepColor.textSecondary)

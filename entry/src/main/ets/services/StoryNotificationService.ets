@@ -104,7 +104,8 @@ export class StoryNotificationService {
     } catch (_) {
     }
 
-    const hours: number[] = [11, 16, 20];
+    // 每天晚间推送两条随机故事，避免在白天打扰用户。
+    const hours: number[] = [21, 22];
     for (let index = 0; index < hours.length; index++) {
       const story = await StoryCatalog.random(context);
       const request: reminderAgentManager.ReminderRequestAlarm = {

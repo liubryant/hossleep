@@ -18,11 +18,15 @@ import { LegalWebPage } from '../components/profile/LegalWebPage';
 import { ProfilePage } from '../components/profile/ProfilePage';
 import { SleepHomePage } from '../components/sleep/SleepHomePage';
 import { SoundHomePage } from '../components/sounds/SoundHomePage';
+import { MindfulnessHomePage } from '../components/sounds/MindfulnessHomePage';
+import { MindfulnessPlayerPage } from '../components/sounds/MindfulnessPlayerPage';
+import { NaturePlayerPage } from '../components/sounds/NaturePlayerPage';
 import { StoryHomePage } from '../components/stories/StoryHomePage';
 import { RotatingStoryCover } from '../components/stories/RotatingStoryCover';
 import { VipMembershipPage } from '../components/vip/VipMembershipPage';
 import { SOUND_SCENES, STORY_ITEMS } from '../models/SleepData';
 import { SleepDetectedEvent, SleepReportData, SoundSceneItem, StoryListItem } from '../models/SleepModels';
+import { MINDFULNESS_ITEMS, MindfulnessItem } from '../models/MindfulnessData';
 import { AppSettings, SavedSettings } from '../services/AppSettings';
 import { AuthService } from '../services/AuthService';
 import { MediaSessionService } from '../services/MediaSessionService';
@@ -30,6 +34,7 @@ import { RemoteContentConfig } from '../services/RemoteContentConfig';
 import { SoundPlayer } from '../services/SoundPlayer';
 import { SleepRecorder } from '../services/SleepRecorder';
 import { StoryCatalog } from '../services/StoryCatalog';
+import { StoryNotificationService } from '../services/StoryNotificationService';
 import { StorySpeaker } from '../services/StorySpeaker';
 import { UmengAnalytics } from '../services/UmengAnalytics';
 
@@ -41,12 +46,15 @@ struct Index {
   @StorageLink('quickActionRoute') @Watch('onQuickActionChanged')
   private quickActionRoute: string = '';
   @State private agreementAccepted: boolean = false;
+  @State private settingsLoaded: boolean = false;
   @State private agreementChecked: boolean = false;
   @State private activeTab: number = 0;
   @State private soundCategory: number = 0;
   @State private activeSoundId: string = '';
   @State private soundPlaying: boolean = false;
   @State private currentSound: SoundSceneItem = SOUND_SCENES[0];
+  @State private allSoundScenes: SoundSceneItem[] = SOUND_SCENES;
+  @State private mindfulnessItem: MindfulnessItem = MINDFULNESS_ITEMS[0];
   @State private downloadingSoundId: string = '';
   @State private soundDownloadProgress: number = -1;
   @State private favoriteSoundIds: string[] = [];
@@ -69,6 +77,7 @@ struct Index {
   @State private isMonitoring: boolean = false;
   @State private sleepElapsedSeconds: number = 0;
   @State private sleepEnvironmentDecibels: number = 0;
+  @State private lastSleepDurationSeconds: number = 0;
   @State private sleepRecordingPath: string = '';
   @State private sleepRecordingPaths: string[] = [];
   @State private sleepRecordingPlaying: boolean = false;
@@ -118,6 +127,20 @@ struct Index {
   }
 
   onBackPress(): boolean {
+    if (this.route === 'mindfulnessHome') {
+      this.route = 'home';
+      return true;
+    }
+    if (this.route === 'mindfulnessPlayer') {
+      this.route = 'mindfulnessHome';
+      this.setStoryImmersiveMode(false);
+      return true;
+    }
+    if (this.route === 'naturePlayer') {
+      this.route = 'mindfulnessHome';
+      this.setStoryImmersiveMode(false);
+      return true;
+    }
     if (this.route === 'storyPlayer') {
       this.route = 'home';
       this.activeTab = 2;
@@ -129,7 +152,9 @@ struct Index {
 
   build() {
     Stack() {
-      if (!this.agreementAccepted && this.route !== 'legalUser' && this.route !== 'legalPrivacy') {
+      if (!this.settingsLoaded) {
+        StartupGatePage()
+      } else if (!this.agreementAccepted && this.route !== 'legalUser' && this.route !== 'legalPrivacy') {
         StartupGatePage()
         PrivacyAgreementDialog({
           isChecked: this.agreementChecked,
@@ -178,6 +203,30 @@ struct Index {
         })
       } else if (this.route === 'storyPlayer') {
         this.storyPlayerPage()
+      } else if (this.route === 'mindfulnessHome') {
+        this.mindfulnessHomePage()
+      } else if (this.route === 'mindfulnessPlayer') {
+        MindfulnessPlayerPage({
+          item: this.mindfulnessItem,
+          onBack: () => {
+            this.route = 'mindfulnessHome';
+            this.setStoryImmersiveMode(false);
+          }
+        })
+      } else if (this.route === 'naturePlayer') {
+        NaturePlayerPage({
+          scene: this.currentSound,
+          isPlaying: this.soundPlaying,
+          onBack: () => {
+            this.route = 'mindfulnessHome';
+            this.setStoryImmersiveMode(false);
+          },
+          onToggle: () => {
+            SoundPlayer.toggle(this.context(), this.currentSound).then((playing: boolean) => {
+              this.soundPlaying = playing;
+            });
+          }
+        })
       } else if (this.route === 'legalUser') {
         this.legalPage('用户协议')
       } else if (this.route === 'legalPrivacy') {
@@ -233,9 +282,8 @@ struct Index {
 
   @Builder
   private homeShell() {
-    Stack({ alignContent: Alignment.Bottom }) {
-      if (this.activeTab === 0) {
-        SoundHomePage({
+    Stack({ alignContent: Alignment.Top }) {
+      SoundHomePage({
           selectedCategory: this.soundCategory,
           activeSoundId: this.activeStoryIndex >= 0 ? '' : this.activeSoundId,
           downloadingSoundId: this.downloadingSoundId,
@@ -246,6 +294,20 @@ struct Index {
           },
           onOpenStories: () => {
             this.activeTab = 2;
+          },
+          onOpenMindfulness: () => {
+            this.route = 'mindfulnessHome';
+          },
+          onOpenMeditation: (item: MindfulnessItem) => {
+            SoundPlayer.stop(this.context());
+            this.soundPlaying = false;
+            this.activeSoundId = '';
+            this.mindfulnessItem = item;
+            this.route = 'mindfulnessPlayer';
+            this.setStoryImmersiveMode(true);
+          },
+          onScenesLoaded: (scenes: SoundSceneItem[]) => {
+            this.allSoundScenes = scenes;
           },
           onToggleFavorite: (id: string) => {
             if (this.favoriteSoundIds.includes(id)) {
@@ -290,18 +352,20 @@ struct Index {
             this.storyPlaying = false;
           }
         })
-      } else if (this.activeTab === 1) {
-        SleepHomePage({
+        .width('100%')
+        .height('100%')
+        .align(Alignment.Top)
+        .visibility(this.activeTab === 0 ? Visibility.Visible : Visibility.Hidden)
+
+      SleepHomePage({
           selectedPage: this.sleepPage,
           isMonitoring: this.isMonitoring,
           elapsedSeconds: this.sleepElapsedSeconds,
-          environmentDecibels: this.sleepEnvironmentDecibels,
+          reportDurationSeconds: this.lastSleepDurationSeconds,
           trendRange: this.trendRange,
           recordingPath: this.sleepRecordingPath,
           recordingPaths: this.sleepRecordingPaths,
           isRecordingPlaying: this.sleepRecordingPlaying,
-          report: this.sleepReport,
-          reports: this.sleepReports,
           onSelectPage: (index: number) => {
             this.sleepPage = index;
           },
@@ -325,8 +389,9 @@ struct Index {
               });
           }
         })
-      } else if (this.activeTab === 2) {
-        StoryHomePage({
+        .visibility(this.activeTab === 1 ? Visibility.Visible : Visibility.Hidden)
+
+      StoryHomePage({
           activeStoryId: this.activeStoryIndex > 0 ? this.activeStory.id : '',
           favoriteStoryIds: this.favoriteStoryIds,
           selectedTab: this.storyListTab,
@@ -366,8 +431,9 @@ struct Index {
             this.openStory(story.index);
           }
         })
-      } else {
-        ProfilePage({
+        .visibility(this.activeTab === 2 ? Visibility.Visible : Visibility.Hidden)
+
+      ProfilePage({
           isLoggedIn: this.isLoggedIn,
           saveClips: this.saveClips,
           sensitivity: this.sensitivity,
@@ -392,7 +458,7 @@ struct Index {
             this.openProfileAction(action);
           }
         })
-      }
+        .visibility(this.activeTab === 3 ? Visibility.Visible : Visibility.Hidden)
 
       if (this.activeSoundId.length > 0 || this.activeStoryIndex > 0) {
         this.miniPlayer()
@@ -404,9 +470,52 @@ struct Index {
           this.activeTab = index;
         }
       })
+      .align(Alignment.Bottom)
     }
     .width('100%')
     .height('100%')
+  }
+
+  @Builder
+  private mindfulnessHomePage() {
+    MindfulnessHomePage({
+      scenes: this.allSoundScenes,
+      downloadingSoundId: this.downloadingSoundId,
+      downloadProgress: this.soundDownloadProgress,
+      onBack: () => this.route = 'home',
+      onOpenMeditation: (item: MindfulnessItem) => {
+        SoundPlayer.stop(this.context());
+        this.soundPlaying = false;
+        this.activeSoundId = '';
+        this.mindfulnessItem = item;
+        this.route = 'mindfulnessPlayer';
+        this.setStoryImmersiveMode(true);
+      },
+      onOpenNature: (scene: SoundSceneItem) => {
+        if (this.downloadingSoundId.length > 0) {
+          promptAction.showToast({ message: '当前声音正在下载，请稍候' });
+          return;
+        }
+        this.currentSound = scene;
+        this.activeSoundId = scene.id;
+        const downloading = !scene.isBundledAudio && !SoundPlayer.isCached(this.context(), scene);
+        this.downloadingSoundId = downloading ? scene.id : '';
+        this.soundDownloadProgress = downloading ? 0 : -1;
+        SoundPlayer.play(this.context(), scene, (progress: number) => this.soundDownloadProgress = progress)
+          .then(() => {
+            this.soundPlaying = true;
+            this.downloadingSoundId = '';
+            this.soundDownloadProgress = -1;
+            this.route = 'naturePlayer';
+            this.setStoryImmersiveMode(true);
+          }).catch(() => {
+            this.soundPlaying = false;
+            this.downloadingSoundId = '';
+            this.soundDownloadProgress = -1;
+            promptAction.showToast({ message: '声音下载或播放失败，请检查网络后重试' });
+          });
+      }
+    })
   }
 
   @Builder
@@ -499,6 +608,7 @@ struct Index {
     .width('92%')
     .padding(12)
     .margin({ bottom: 74 })
+    .align(Alignment.Bottom)
     .backgroundColor('#F7FFFFFF')
     .borderRadius(16)
     .shadow({ radius: 16, color: '#20000000', offsetY: 6 })
@@ -1475,6 +1585,7 @@ struct Index {
           lightSeconds: 0, dreamSeconds: 0, awakeSeconds: 0, events: []
         };
         this.sleepReports = [];
+        this.lastSleepDurationSeconds = 0;
         AppSettings.clearSleepReport(this.context());
         promptAction.showToast({ message: '本地睡眠录音和缓存数据已清除' });
       });
@@ -1488,22 +1599,29 @@ struct Index {
   }
 
   private async restoreSettings(): Promise<void> {
-    const saved: SavedSettings = await AppSettings.load(this.context());
-    this.agreementAccepted = saved.agreementAccepted;
-    if (saved.agreementAccepted) {
-      await UmengAnalytics.initialize();
-      await this.initializeAfterPrivacyConsent();
-      await this.loadRemoteStorySwitch();
+    try {
+      const saved: SavedSettings = await AppSettings.load(this.context());
+      this.agreementAccepted = saved.agreementAccepted;
+      if (saved.agreementAccepted) {
+        await UmengAnalytics.initialize();
+        await this.initializeAfterPrivacyConsent();
+        await this.loadRemoteStorySwitch();
+        await this.configureStoryNotifications(saved.storyReminderEnabled, saved.storyReminderAsked);
+      }
+      this.isLoggedIn = saved.isLoggedIn;
+      this.phoneNumber = saved.phoneNumber;
+      this.accessToken = saved.accessToken;
+      this.saveClips = saved.saveAudioClips;
+      this.sensitivity = saved.sensitivity * 100;
+      this.favoriteSoundIds = saved.favoriteSoundIds;
+      this.favoriteStoryIds = saved.favoriteStoryIds;
+      this.sleepReport = saved.sleepReport;
+      this.sleepReports = saved.sleepReports;
+      this.lastSleepDurationSeconds = saved.sleepReport.hasData ? saved.sleepReport.durationSeconds : 0;
+    } finally {
+      // 本地设置读取完毕后再决定是否展示隐私弹窗，避免已同意用户冷启动时闪现一帧。
+      this.settingsLoaded = true;
     }
-    this.isLoggedIn = saved.isLoggedIn;
-    this.phoneNumber = saved.phoneNumber;
-    this.accessToken = saved.accessToken;
-    this.saveClips = saved.saveAudioClips;
-    this.sensitivity = saved.sensitivity * 100;
-    this.favoriteSoundIds = saved.favoriteSoundIds;
-    this.favoriteStoryIds = saved.favoriteStoryIds;
-    this.sleepReport = saved.sleepReport;
-    this.sleepReports = saved.sleepReports;
   }
 
   private async acceptPrivacyAgreement(): Promise<void> {
@@ -1512,6 +1630,7 @@ struct Index {
     await UmengAnalytics.initialize();
     await this.initializeAfterPrivacyConsent();
     await this.loadRemoteStorySwitch();
+    await this.configureStoryNotifications(false, false);
     this.consumeNotificationStory();
     this.consumeQuickAction();
   }
@@ -1520,6 +1639,21 @@ struct Index {
     this.storySwitch = await RemoteContentConfig.fetchStorySwitch();
     StoryCatalog.setArticlesEnabled(this.storySwitch === 1);
     this.storyCatalog = await StoryCatalog.load(this.context());
+  }
+
+  private async configureStoryNotifications(enabled: boolean, asked: boolean): Promise<void> {
+    // 已授权用户每次启动时重新注册，可同步最新的推送时间和随机故事。
+    if (enabled) {
+      const active = await StoryNotificationService.enable(this.context());
+      await AppSettings.setStoryReminderEnabled(this.context(), active);
+      return;
+    }
+    // 隐私协议同意后仅主动询问一次，拒绝后不反复弹窗打扰。
+    if (!asked) {
+      await AppSettings.markStoryReminderAsked(this.context());
+      const active = await StoryNotificationService.enable(this.context());
+      await AppSettings.setStoryReminderEnabled(this.context(), active);
+    }
   }
 
   private async initializeAfterPrivacyConsent(): Promise<void> {
@@ -1635,6 +1769,7 @@ struct Index {
         this.sleepRecordingPaths = SleepRecorder.listRecordings(this.context());
         this.sleepReport = this.analyzeSleepSession();
         this.sleepReports = [this.sleepReport].concat(this.sleepReports).slice(0, 180);
+        this.lastSleepDurationSeconds = this.sleepElapsedSeconds;
         this.sleepPage = 1;
         await AppSettings.setSleepReport(this.context(), this.sleepReport);
         promptAction.showToast({ message: `睡眠录音已保存：${path.substring(path.lastIndexOf('/') + 1)}` });

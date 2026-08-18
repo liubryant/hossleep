@@ -9,6 +9,7 @@ import { SOUND_CATEGORIES, SOUND_SCENES } from '../../models/SleepData';
 import { SoundSceneItem } from '../../models/SleepModels';
 import { SoundPlayer } from '../../services/SoundPlayer';
 import { SoundCard } from './SoundCard';
+import { MINDFULNESS_ITEMS, MindfulnessItem } from '../../models/MindfulnessData';
 
 interface SoundManifestItem {
   id: string;
@@ -32,6 +33,9 @@ export struct SoundHomePage {
   onOpenStories: () => void = () => {};
   onPlaySound: (scene: SoundSceneItem) => void = () => {};
   onToggleFavorite: (id: string) => void = () => {};
+  onOpenMindfulness: () => void = () => {};
+  onOpenMeditation: (item: MindfulnessItem) => void = () => {};
+  onScenesLoaded: (scenes: SoundSceneItem[]) => void = () => {};
   @State private scenes: SoundSceneItem[] = SOUND_SCENES;
   @State private searchKeyword: string = '';
 
@@ -42,41 +46,55 @@ export struct SoundHomePage {
   build() {
     Column({ space: 0 }) {
       this.topBar()
-      this.featureCategories()
-      this.searchBar()
+      Scroll() {
+        Column({ space: 0 }) {
+          this.featureCategories()
+          this.searchBar()
 
-      if (this.displayedScenes().length === 0) {
-        this.emptyState()
-      } else {
-        Grid() {
-          ForEach(this.displayedScenes(), (scene: SoundSceneItem) => {
-            GridItem() {
-              SoundCard({
-                scene: scene,
-                isPlaying: this.activeSoundId === scene.id,
-                isFavorite: this.favoriteSoundIds.includes(scene.id),
-                isCached: SoundPlayer.isCached(getContext(this) as common.UIAbilityContext, scene),
-                downloadProgress: this.downloadingSoundId === scene.id ? this.downloadProgress : -1,
-                onToggle: () => {
-                  this.onPlaySound(scene);
-                },
-                onFavorite: () => {
-                  this.onToggleFavorite(scene.id);
+          if (this.selectedCategory === 0) {
+            this.homeMindfulnessSection()
+            this.homeNatureTitle()
+          }
+
+          if (this.displayedScenes().length === 0) {
+            this.emptyState()
+          } else {
+            Grid() {
+              ForEach(this.displayedScenes(), (scene: SoundSceneItem) => {
+                GridItem() {
+                  SoundCard({
+                  scene: scene,
+                  isPlaying: this.activeSoundId === scene.id,
+                  isFavorite: this.favoriteSoundIds.includes(scene.id),
+                  isCached: SoundPlayer.isCached(getContext(this) as common.UIAbilityContext, scene),
+                  downloadProgress: this.downloadingSoundId === scene.id ? this.downloadProgress : -1,
+                  onToggle: () => {
+                    this.onPlaySound(scene);
+                  },
+                  onFavorite: () => {
+                    this.onToggleFavorite(scene.id);
+                  }
+                })
+                  .width('100%')
+                  .height(220)
                 }
-              })
-              .width('100%')
-              .height(220)
+                .height(220)
+              }, (scene: SoundSceneItem) => scene.id)
             }
-            .height(220)
-          }, (scene: SoundSceneItem) => scene.id)
+            .columnsTemplate('1fr 1fr')
+            .columnsGap(12)
+            .rowsGap(6)
+            .padding({ left: 16, right: 16, top: 4, bottom: 108 })
+            .height(this.soundGridHeight())
+            .scrollBar(BarState.Off)
+          }
         }
-        .columnsTemplate('1fr 1fr')
-        .columnsGap(12)
-        .rowsGap(6)
-        .padding({ left: 16, right: 16, top: 4, bottom: 108 })
-        .layoutWeight(1)
-        .scrollBar(BarState.Off)
+        .width('100%')
+        .width('100%')
       }
+      .layoutWeight(1)
+      .width('100%')
+      .scrollBar(BarState.Off)
     }
     .width('100%')
     .height('100%')
@@ -112,7 +130,7 @@ export struct SoundHomePage {
       }
       GridItem() {
         this.featureItem('自在正念', $rawfile('icons_sleep/category_mindfulness.svg'), 9,
-          () => this.onSelectCategory(9))
+          () => this.onOpenMindfulness())
       }
       GridItem() {
         this.featureItem('冥想专题', $rawfile('icons_sleep/category_meditation.svg'), 3,
@@ -126,6 +144,40 @@ export struct SoundHomePage {
     .width('100%')
     .height(156)
     .padding({ left: 12, right: 12, bottom: 8 })
+  }
+
+  @Builder
+  private homeMindfulnessSection() {
+    Column({ space: 10 }) {
+      Row() {
+        Column({ space: 2 }) {
+          Text('正念冥想').fontSize(16).fontWeight(FontWeight.Medium).fontColor(SleepColor.textPrimary)
+          Text('跟随声音，把注意力带回当下').fontSize(11).fontColor(SleepColor.textSecondary)
+        }.alignItems(HorizontalAlign.Start)
+        Blank()
+        Text('更多').fontSize(13).fontColor(SleepColor.primary).onClick(this.onOpenMindfulness)
+      }.width('100%').padding({ left: 16, right: 16 })
+      Scroll() {
+        Row({ space: 12 }) {
+          ForEach(MINDFULNESS_ITEMS.slice(0, 6), (item: MindfulnessItem) => {
+            Column({ space: 7 }) {
+              Image(`resource://RAWFILE/${item.cover}`).width(112).height(148)
+                .objectFit(ImageFit.Cover).borderRadius(12).clip(true)
+              Text(item.title).width(112).fontSize(13).fontWeight(FontWeight.Normal)
+                .fontColor(SleepColor.textPrimary).maxLines(1)
+            }.alignItems(HorizontalAlign.Start).onClick(() => this.onOpenMeditation(item))
+          }, (item: MindfulnessItem) => item.id)
+        }.padding({ left: 16, right: 16 })
+      }.height(178).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
+    }.width('100%').padding({ top: 12 })
+  }
+
+  @Builder
+  private homeNatureTitle() {
+    Column({ space: 2 }) {
+      Text('大自然入眠').fontSize(16).fontWeight(FontWeight.Medium).fontColor(SleepColor.textPrimary)
+      Text('枕着山海风雨，慢慢沉入梦乡').fontSize(11).fontColor(SleepColor.textSecondary)
+    }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 16, right: 16, top: 8, bottom: 5 })
   }
 
   @Builder
@@ -318,8 +370,8 @@ export struct SoundHomePage {
       .margin({ top: 8 })
       .onClick(() => this.onSelectCategory(0))
     }
-    .layoutWeight(1)
     .width('100%')
+    .height(300)
     .padding({ bottom: 112 })
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
@@ -349,6 +401,10 @@ export struct SoundHomePage {
     return title.length > 3 ? 78 : 62;
   }
 
+  private soundGridHeight(): number {
+    return Math.ceil(this.displayedScenes().length / 2) * 226 + 112;
+  }
+
   private async loadScenes(): Promise<void> {
     try {
       const context = getContext(this) as common.UIAbilityContext;
@@ -368,8 +424,10 @@ export struct SoundHomePage {
           isBundledAudio: item.index <= 20
         };
       });
+      this.onScenesLoaded(this.scenes);
     } catch (_) {
       this.scenes = SOUND_SCENES;
+      this.onScenesLoaded(this.scenes);
     }
   }
 

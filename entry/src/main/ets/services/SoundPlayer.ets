@@ -91,6 +91,20 @@ export class SoundPlayer {
     await SoundPlayer.releaseCurrent(context);
   }
 
+  static currentTime(): number {
+    return SoundPlayer.player ? SoundPlayer.player.currentTime : 0;
+  }
+
+  static duration(): number {
+    return SoundPlayer.player ? SoundPlayer.player.duration : 0;
+  }
+
+  static async seek(milliseconds: number): Promise<void> {
+    if (SoundPlayer.player) {
+      await SoundPlayer.player.seek(milliseconds);
+    }
+  }
+
   private static async releaseCurrent(context: common.UIAbilityContext): Promise<void> {
     if (SoundPlayer.player) {
       await SoundPlayer.player.release();
