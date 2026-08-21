@@ -20,7 +20,8 @@ export struct MindfulnessPlayerPage {
   private stopTimer: number = -1;
 
   aboutToAppear(): void {
-    MindfulnessPlayer.play(getContext(this) as common.UIAbilityContext, this.item.audio).then(() => {
+    MindfulnessPlayer.play(getContext(this) as common.UIAbilityContext, this.item.audio,
+      this.item.isBundledAudio !== false).then(() => {
       this.isPlaying = true;
       this.onPlaybackChanged(true);
     }).catch(() => promptAction.showToast({ message: '音频加载失败' }));
@@ -191,6 +192,7 @@ export struct MindfulnessPlayerPage {
     .backgroundColor(this.timerRemainingSeconds > 0 ? '#32FFFFFF' : '#15FFFFFF')
     .borderRadius(17)
     .bindMenu([
+      { value: '5分钟后停止', action: () => this.startStopTimer(5) },
       { value: '15分钟后停止', action: () => this.startStopTimer(15) },
       { value: '30分钟后停止', action: () => this.startStopTimer(30) },
       { value: '45分钟后停止', action: () => this.startStopTimer(45) },

@@ -7,6 +7,9 @@ export interface MindfulnessItem {
   cover: string;
   audio: string;
   colors: string[];
+  isBundledAudio?: boolean;
+  downloadUrl?: string;
+  sizeBytes?: number;
 }
 
 export interface MindfulnessBanner {
@@ -35,4 +38,3 @@ export const MINDFULNESS_BANNERS: MindfulnessBanner[] = [
 export function lastNatureScenes(scenes: SoundSceneItem[]): SoundSceneItem[] {
   return scenes.slice(Math.max(0, scenes.length - 20));
 }
-

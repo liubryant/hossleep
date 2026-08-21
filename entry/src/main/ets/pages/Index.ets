@@ -105,9 +105,12 @@ struct Index {
   @State private securityMessage: string = '';
   @State private securityBusy: boolean = false;
   @State private vipSoundPromptVisible: boolean = false;
+  @State private playbackStopRemainingSeconds: number = 0;
   private sleepTimer: number = -1;
   private storyPlaybackTimer: number = -1;
   private storyClockTimer: number = -1;
+  private playbackStopTimer: number = -1;
+  private playbackStopDeadline: number = 0;
   private storyLoadToken: number = 0;
   // 本地测试期间不限制睡眠报告生成时长；正式发布前恢复为 30 * 60。
   private minimumSleepReportSeconds: number = 30 * 60;
@@ -123,6 +126,7 @@ struct Index {
 
   aboutToDisappear(): void {
     this.stopSleepTimer();
+    this.cancelPlaybackStopTimer(false);
     if (this.storyClockTimer >= 0) {
       clearInterval(this.storyClockTimer);
       this.storyClockTimer = -1;
@@ -130,6 +134,15 @@ struct Index {
   }
 
   onBackPress(): boolean {
+    if (this.route === 'vip') {
+      this.route = 'home';
+      this.activeTab = 3;
+      return true;
+    }
+    if (this.route === 'legalVip') {
+      this.route = 'vip';
+      return true;
+    }
     if (this.route === 'mindfulnessHome') {
       this.route = 'home';
       return true;
@@ -307,6 +320,7 @@ struct Index {
           downloadingSoundId: this.downloadingSoundId,
           downloadProgress: this.soundDownloadProgress,
           favoriteSoundIds: this.favoriteSoundIds,
+          playbackStopRemainingSeconds: this.playbackStopRemainingSeconds,
           onSelectCategory: (index: number) => {
             this.soundCategory = index;
           },
@@ -331,6 +345,12 @@ struct Index {
           },
           onScenesLoaded: (scenes: SoundSceneItem[]) => {
             this.allSoundScenes = scenes;
+          },
+          onSetPlaybackStopTimer: (minutes: number) => {
+            this.setPlaybackStopTimer(minutes);
+          },
+          onCancelPlaybackStopTimer: () => {
+            this.cancelPlaybackStopTimer(true);
           },
           onToggleFavorite: (id: string) => {
             if (this.favoriteSoundIds.includes(id)) {
@@ -1356,6 +1376,50 @@ struct Index {
     this.route = 'storyPlayer';
     this.setStoryImmersiveMode(true);
     this.openStory(story.index);
+  }
+
+  private setPlaybackStopTimer(minutes: number): void {
+    this.cancelPlaybackStopTimer(false);
+    this.playbackStopDeadline = Date.now() + minutes * 60 * 1000;
+    this.playbackStopRemainingSeconds = minutes * 60;
+    this.playbackStopTimer = setInterval(() => {
+      this.playbackStopRemainingSeconds = Math.max(0,
+        Math.ceil((this.playbackStopDeadline - Date.now()) / 1000));
+      if (this.playbackStopRemainingSeconds === 0) {
+        this.cancelPlaybackStopTimer(false);
+        this.stopAllPlaybackForTimer();
+        promptAction.showToast({ message: '定时关闭已执行' });
+      }
+    }, 1000);
+    promptAction.showToast({ message: `将在${minutes}分钟后关闭播放` });
+  }
+
+  private cancelPlaybackStopTimer(showMessage: boolean): void {
+    const wasActive = this.playbackStopRemainingSeconds > 0;
+    if (this.playbackStopTimer >= 0) {
+      clearInterval(this.playbackStopTimer);
+      this.playbackStopTimer = -1;
+    }
+    this.playbackStopDeadline = 0;
+    this.playbackStopRemainingSeconds = 0;
+    if (showMessage) {
+      promptAction.showToast({ message: wasActive ? '已取消定时关闭' : '当前未设置定时关闭' });
+    }
+  }
+
+  private stopAllPlaybackForTimer(): void {
+    MindfulnessPlayer.stop(this.context());
+    SoundPlayer.stop(this.context());
+    StorySpeaker.stop();
+    this.cancelStoryPlaybackTimer(false);
+    this.activeMindfulnessId = '';
+    this.mindfulnessPlaying = false;
+    this.activeSoundId = '';
+    this.soundPlaying = false;
+    this.activeStoryIndex = -1;
+    this.storyPlaying = false;
+    this.activeStoryLine = -1;
+    MediaSessionService.stop();
   }
 
   private setStoryPlaybackTimer(minutes: number): void {

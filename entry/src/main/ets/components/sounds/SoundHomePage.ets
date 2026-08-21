@@ -32,6 +32,7 @@ export struct SoundHomePage {
   @Prop downloadingSoundId: string = '';
   @Prop downloadProgress: number = -1;
   @Prop favoriteSoundIds: string[] = [];
+  @Prop playbackStopRemainingSeconds: number = 0;
   onSelectCategory: (index: number) => void = () => {};
   onOpenStories: () => void = () => {};
   onPlaySound: (scene: SoundSceneItem) => void = () => {};
@@ -39,6 +40,8 @@ export struct SoundHomePage {
   onOpenMindfulness: () => void = () => {};
   onOpenMeditation: (item: MindfulnessItem) => void = () => {};
   onScenesLoaded: (scenes: SoundSceneItem[]) => void = () => {};
+  onSetPlaybackStopTimer: (minutes: number) => void = () => {};
+  onCancelPlaybackStopTimer: () => void = () => {};
   @State private scenes: SoundSceneItem[] = SOUND_SCENES;
   @State private searchKeyword: string = '';
   @State private headerVisibleCharacterCount: number = 0;
@@ -293,7 +296,15 @@ export struct SoundHomePage {
       .bindMenu([
         { value: '全部声音', action: () => this.onSelectCategory(0) },
         { value: '推荐声音', action: () => this.onSelectCategory(1) },
-        { value: '我的收藏', action: () => this.onSelectCategory(2) }
+        { value: '我的收藏', action: () => this.onSelectCategory(2) },
+        { value: '15分钟后停止', action: () => this.onSetPlaybackStopTimer(15) },
+        { value: '30分钟后停止', action: () => this.onSetPlaybackStopTimer(30) },
+        { value: '60分钟后停止', action: () => this.onSetPlaybackStopTimer(60) },
+        {
+          value: this.playbackStopRemainingSeconds > 0 ?
+            `取消定时（剩余${Math.ceil(this.playbackStopRemainingSeconds / 60)}分钟）` : '取消定时',
+          action: () => this.onCancelPlaybackStopTimer()
+        }
       ])
     }
     .width('100%')

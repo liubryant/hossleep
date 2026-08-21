@@ -1,7 +1,9 @@
 import { common } from '@kit.AbilityKit';
+import { promptAction } from '@kit.ArkUI';
 import { SleepColor } from '../../common/SleepDesign';
 import { MINDFULNESS_BANNERS, MINDFULNESS_ITEMS, MindfulnessBanner, MindfulnessItem, lastNatureScenes } from '../../models/MindfulnessData';
 import { SoundSceneItem } from '../../models/SleepModels';
+import { MindfulnessCatalog } from '../../services/MindfulnessCatalog';
 import { SoundPlayer } from '../../services/SoundPlayer';
 import { SoundCoverImage } from '../common/CoverImages';
 
@@ -14,6 +16,13 @@ export struct MindfulnessHomePage {
   onOpenMeditation: (item: MindfulnessItem) => void = () => {};
   onOpenNature: (scene: SoundSceneItem) => void = () => {};
   @State private bannerIndex: number = 0;
+  @State private remoteItems: MindfulnessItem[] = [];
+  @State private downloadingMindfulnessId: string = '';
+  @State private mindfulnessDownloadProgress: number = -1;
+
+  aboutToAppear(): void {
+    this.loadRemoteMindfulness();
+  }
 
   build() {
     Column() {
@@ -101,10 +110,14 @@ export struct MindfulnessHomePage {
   private meditationGrid() {
     Scroll() {
       Row({ space: 12 }) {
-        ForEach([0, 2, 4, 6], (startIndex: number) => {
+        ForEach(this.meditationColumnStarts(), (startIndex: number) => {
           Column({ space: 12 }) {
-            this.meditationCard(MINDFULNESS_ITEMS[startIndex])
-            this.meditationCard(MINDFULNESS_ITEMS[startIndex + 1])
+            if (startIndex < this.allMeditationItems().length) {
+              this.meditationCard(this.allMeditationItems()[startIndex])
+            }
+            if (startIndex + 1 < this.allMeditationItems().length) {
+              this.meditationCard(this.allMeditationItems()[startIndex + 1])
+            }
           }
         }, (startIndex: number) => `${startIndex}`)
       }
@@ -119,13 +132,70 @@ export struct MindfulnessHomePage {
       Stack({ alignContent: Alignment.BottomEnd }) {
         Image(`resource://RAWFILE/${item.cover}`).width(136).height(136)
           .objectFit(ImageFit.Cover).borderRadius(14).clip(true)
-        Stack() { Image($rawfile('icons_sleep/ic_play.svg')).width(14).height(14).fillColor(Color.White) }
-          .width(32).height(32).borderRadius(16).backgroundColor('#65000000').margin(9)
+        if (this.downloadingMindfulnessId === item.id) {
+          Text(`${Math.floor(Math.max(0, this.mindfulnessDownloadProgress) * 100)}%`)
+            .fontSize(10).fontColor(Color.White).width(38).height(38).textAlign(TextAlign.Center)
+            .backgroundColor('#88000000').borderRadius(19).margin(9)
+        } else {
+          Stack() {
+            Image(MindfulnessCatalog.isCached(getContext(this) as common.UIAbilityContext, item) ?
+              $rawfile('icons_sleep/ic_play.svg') : $rawfile('icons_sleep/ic_download.svg'))
+              .width(14).height(14).fillColor(Color.White)
+          }.width(32).height(32).borderRadius(16).backgroundColor('#65000000').margin(9)
+        }
       }
       Text(item.title).width(136).fontSize(14).fontWeight(FontWeight.Medium).fontColor(SleepColor.textPrimary).maxLines(1)
       Text(item.subtitle).width(136).fontSize(11).fontColor(SleepColor.textSecondary).maxLines(1)
     }
-    .width(136).height(185).alignItems(HorizontalAlign.Start).onClick(() => this.onOpenMeditation(item))
+    .width(136).height(185).alignItems(HorizontalAlign.Start).onClick(() => this.openMeditation(item))
+  }
+
+  private allMeditationItems(): MindfulnessItem[] {
+    return [...MINDFULNESS_ITEMS, ...this.remoteItems];
+  }
+
+  private meditationColumnStarts(): number[] {
+    const starts: number[] = [];
+    for (let index = 0; index < this.allMeditationItems().length; index += 2) {
+      starts.push(index);
+    }
+    return starts;
+  }
+
+  private loadRemoteMindfulness(): void {
+    MindfulnessCatalog.load(getContext(this) as common.UIAbilityContext)
+      .then((items: MindfulnessItem[]) => {
+        this.remoteItems = items;
+      })
+      .catch(() => {
+        this.remoteItems = [];
+      });
+  }
+
+  private openMeditation(item: MindfulnessItem): void {
+    if (this.downloadingMindfulnessId.length > 0) {
+      promptAction.showToast({ message: '当前正念音频正在下载，请稍候' });
+      return;
+    }
+    const context = getContext(this) as common.UIAbilityContext;
+    if (MindfulnessCatalog.isCached(context, item)) {
+      this.onOpenMeditation(item);
+      return;
+    }
+    this.downloadingMindfulnessId = item.id;
+    this.mindfulnessDownloadProgress = 0;
+    MindfulnessCatalog.download(context, item, (progress: number) => {
+      this.mindfulnessDownloadProgress = progress;
+    }).then(() => {
+      this.downloadingMindfulnessId = '';
+      this.mindfulnessDownloadProgress = -1;
+      promptAction.showToast({ message: '下载完成，正在播放' });
+      this.onOpenMeditation(item);
+    }).catch(() => {
+      this.downloadingMindfulnessId = '';
+      this.mindfulnessDownloadProgress = -1;
+      promptAction.showToast({ message: '正念音频下载失败，请检查网络后重试' });
+    });
   }
 
   @Builder

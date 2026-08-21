@@ -8,6 +8,7 @@ export interface VipProductJson {
   name?: string;
   price?: string | number;
   description?: string;
+  durationDays?: number | string;
 }
 
 export class VipProduct {
@@ -15,12 +16,14 @@ export class VipProduct {
   name: string;
   price: string;
   description: string;
+  durationDays: number;
 
-  constructor(id: string, name: string, price: string, description: string) {
+  constructor(id: string, name: string, price: string, description: string, durationDays: number) {
     this.id = id;
     this.name = name;
     this.price = price;
     this.description = description;
+    this.durationDays = durationDays;
   }
 
   static from(json: VipProductJson): VipProduct {
@@ -28,8 +31,17 @@ export class VipProduct {
       json.id ?? '',
       json.name ?? '会员套餐',
       json.price === undefined ? '' : `${json.price}`,
-      json.description ?? ''
+      json.description ?? '',
+      VipProduct.durationValue(json.durationDays)
     );
+  }
+
+  private static durationValue(value: number | string | undefined): number {
+    if (value === undefined) {
+      return 0;
+    }
+    const duration = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(duration) ? duration : 0;
   }
 }
 

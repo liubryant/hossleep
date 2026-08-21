@@ -33,6 +33,8 @@ export struct VipMembershipPage {
   @State private currentOrderId: string = '';
   private orderPollTimer: number = -1;
   private orderPollCount: number = 0;
+  private previousLayoutFullScreen: boolean = false;
+  private hasCapturedWindowMode: boolean = false;
 
   aboutToAppear(): void {
     this.setImmersiveMode(true);
@@ -41,13 +43,17 @@ export struct VipMembershipPage {
 
   aboutToDisappear(): void {
     this.stopOrderPolling();
-    this.setImmersiveMode(false);
+    this.restoreWindowMode();
   }
 
   private async setImmersiveMode(enabled: boolean): Promise<void> {
     try {
       const context = getContext(this) as common.UIAbilityContext;
       const mainWindow = await window.getLastWindow(context);
+      if (enabled && !this.hasCapturedWindowMode) {
+        this.previousLayoutFullScreen = mainWindow.getWindowProperties().isLayoutFullScreen;
+        this.hasCapturedWindowMode = true;
+      }
       await mainWindow.setWindowLayoutFullScreen(enabled);
       await mainWindow.setWindowSystemBarProperties({
         statusBarColor: enabled ? '#00000000' : '#F2F2F7',
@@ -57,6 +63,28 @@ export struct VipMembershipPage {
       });
     } catch (_) {
     }
+  }
+
+  private async restoreWindowMode(): Promise<void> {
+    try {
+      const context = getContext(this) as common.UIAbilityContext;
+      const mainWindow = await window.getLastWindow(context);
+      const layoutFullScreen = this.hasCapturedWindowMode ? this.previousLayoutFullScreen : false;
+      await mainWindow.setWindowLayoutFullScreen(layoutFullScreen);
+      await mainWindow.setWindowSystemBarProperties({
+        statusBarColor: '#F2F2F7',
+        statusBarContentColor: '#111827',
+        navigationBarColor: '#FFFFFF',
+        navigationBarContentColor: '#111827'
+      });
+      this.hasCapturedWindowMode = false;
+    } catch (_) {
+    }
+  }
+
+  private async closePage(): Promise<void> {
+    await this.restoreWindowMode();
+    this.onClose();
   }
 
   private reload(): void {
@@ -112,7 +140,7 @@ export struct VipMembershipPage {
       .justifyContent(FlexAlign.Center)
       .alignItems(VerticalAlign.Center)
       .onClick(() => {
-        this.onClose();
+        this.closePage();
       })
 
       Text('VIP 会员')
@@ -197,14 +225,14 @@ export struct VipMembershipPage {
 
   @Builder
   private benefitsBand() {
-    Column({ space: 12 }) {
+    Column({ space: 8 }) {
       Text('会员权益')
         .fontSize(14)
         .fontWeight(FontWeight.Bold)
         .fontColor('#FFEDBD')
         .width('100%')
         .textAlign(TextAlign.Center)
-        .margin({ top: 16 })
+        .margin({ top: 10 })
       Text('查看套餐详情  ›')
         .fontSize(11)
         .fontColor('#CDAF7A')
@@ -217,11 +245,11 @@ export struct VipMembershipPage {
         this.benefitItem('∞', '会员期内\n无限畅听')
       }
       .width('100%')
-      .margin({ top: 4 })
+      .margin({ top: 1 })
     }
     .width('100%')
-    .padding({ left: 12, right: 12, bottom: 20 })
-    .borderRadius(16)
+    .padding({ left: 10, right: 10, bottom: 13 })
+    .borderRadius(14)
     .linearGradient({
       angle: 135,
       colors: [['#2B211A', 0], ['#3D2B1F', 0.55], ['#211914', 1]] as [string, number][]
@@ -234,20 +262,20 @@ export struct VipMembershipPage {
 
   @Builder
   private benefitItem(icon: string, title: string) {
-    Column({ space: 8 }) {
+    Column({ space: 5 }) {
       Column() {
         Text(icon)
-          .fontSize(18)
+          .fontSize(16)
           .fontColor('#864F2D')
       }
-      .width(36)
-      .height(36)
-      .borderRadius(18)
+      .width(31)
+      .height(31)
+      .borderRadius(16)
       .justifyContent(FlexAlign.Center)
       .backgroundColor('#FEEBB9')
 
       Text(title)
-        .fontSize(12)
+        .fontSize(11)
         .fontColor(Color.White)
     }
     .layoutWeight(1)
@@ -258,13 +286,13 @@ export struct VipMembershipPage {
   private productSection() {
     Column({ space: 8 }) {
       Scroll() {
-        Row({ space: 10 }) {
+        Row({ space: 8 }) {
           if (this.isLoadingProducts) {
             Text('会员套餐\n\n加载中...')
               .fontSize(13)
               .fontColor('#CDAF7A')
-              .width(132)
-              .height(142)
+              .width(118)
+              .height(124)
               .textAlign(TextAlign.Center)
               .backgroundColor('#1A1512')
               .borderRadius(10)
@@ -273,7 +301,7 @@ export struct VipMembershipPage {
               .fontSize(13)
               .fontColor('#CDAF7A')
               .width(180)
-              .height(142)
+              .height(124)
               .textAlign(TextAlign.Center)
               .backgroundColor('#1A1512')
               .borderRadius(10)
@@ -286,7 +314,7 @@ export struct VipMembershipPage {
         .padding({ left: 0, right: 0, top: 8, bottom: 8 })
       }
       .width('100%')
-      .height(164)
+      .height(145)
       .scrollable(ScrollDirection.Horizontal)
       .scrollBar(BarState.Off)
 
@@ -314,21 +342,29 @@ export struct VipMembershipPage {
     Stack({ alignContent: Alignment.Top }) {
       Column({ space: 9 }) {
         Text(`￥${product.price}`)
-          .fontSize(25)
+          .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.selectedProductId === product.id ? '#864F2D' : '#EBC783')
           .width('100%')
           .textAlign(TextAlign.Center)
 
         Text(product.name)
-          .fontSize(12)
+          .fontSize(11)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.selectedProductId === product.id ? '#6B3820' : '#B6A58E')
           .width('100%')
           .textAlign(TextAlign.Center)
 
+        if (product.durationDays > 0) {
+          Text(`${product.durationDays} 天会员权益`)
+            .fontSize(9)
+            .fontColor(this.selectedProductId === product.id ? '#8A4A28' : '#8E7D68')
+            .width('100%')
+            .textAlign(TextAlign.Center)
+        }
+
         Text(product.description.length > 0 ? product.description : this.badgeText(index))
-          .fontSize(10)
+          .fontSize(9)
           .fontColor(this.selectedProductId === product.id ? '#9B5C38' : '#7A6B58')
           .width('100%')
           .textAlign(TextAlign.Center)
@@ -336,9 +372,9 @@ export struct VipMembershipPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
       .width('100%')
-      .height(142)
-      .margin({ top: 16 })
-      .padding({ left: 10, right: 10, top: 20, bottom: 14 })
+      .height(124)
+      .margin({ top: 13 })
+      .padding({ left: 8, right: 8, top: 14, bottom: 10 })
       .justifyContent(FlexAlign.Center)
       .borderRadius(10)
       .linearGradient(this.selectedProductId === product.id ? {
@@ -351,11 +387,11 @@ export struct VipMembershipPage {
       .border({ width: this.selectedProductId === product.id ? 2 : 1, color: this.selectedProductId === product.id ? '#EBC783' : '#514437' })
 
       Text(this.badgeText(index))
-        .fontSize(10)
+        .fontSize(9)
         .fontWeight(FontWeight.Medium)
         .fontColor(Color.White)
-        .height(22)
-        .padding({ left: 12, right: 12 })
+        .height(20)
+        .padding({ left: 10, right: 10 })
         .linearGradient({
           angle: 90,
           colors: [[this.badgeStartColor(index), 0], [this.badgeEndColor(index), 1]] as [string, number][]
@@ -364,8 +400,8 @@ export struct VipMembershipPage {
         .shadow({ radius: 3, color: 'rgba(0,0,0,0.22)', offsetX: 0, offsetY: 1 })
         .margin({ top: 4 })
     }
-    .width(138)
-    .height(164)
+    .width(122)
+    .height(145)
     .onClick(() => {
       this.selectedProductId = product.id;
       this.statusText = this.memberActive ? '会员已开通，可继续续费' : '请选择套餐并支付';
@@ -775,7 +811,7 @@ export struct VipMembershipPage {
       .justifyContent(FlexAlign.Center)
     }
     .width('100%')
-    .padding({ left: 28, right: 28, top: 7, bottom: 10 })
+    .padding({ left: 28, right: 28, top: 7, bottom: 20 })
     .backgroundColor('#0D0703')
   }
 
@@ -794,7 +830,8 @@ export struct VipMembershipPage {
   }
 
   private canPay(): boolean {
-    return !this.isPaying && this.products.length > 0;
+    return !this.isPaying && this.isLoggedIn && this.accessToken.length > 0 &&
+      this.isAgreementChecked && this.selectedProduct() !== null;
   }
 
   private selectedProduct(): VipProduct | null {
@@ -922,6 +959,7 @@ export struct VipMembershipPage {
     }
     this.stopOrderPolling();
     this.orderPollCount = 0;
+    this.queryCurrentOrder();
     this.orderPollTimer = setInterval(() => {
       this.orderPollCount += 1;
       this.queryCurrentOrder();
@@ -955,6 +993,10 @@ export struct VipMembershipPage {
           this.onMembershipChanged(true);
           this.statusText = '支付成功，会员已开通';
           this.loadMembershipStatus();
+        } else if (status === 'closed' || status === 'cancelled' || status === 'canceled' || status === 'failed') {
+          this.stopOrderPolling();
+          this.isPaying = false;
+          this.statusText = status === 'failed' ? '支付失败，请重新发起支付' : '订单已关闭';
         }
       })
       .catch(() => {

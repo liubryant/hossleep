@@ -1,14 +1,16 @@
 import { common } from '@kit.AbilityKit';
+import { fileIo as fs } from '@kit.CoreFileKit';
 import { media } from '@kit.MediaKit';
 import { resourceManager } from '@kit.LocalizationKit';
 
 export class MindfulnessPlayer {
   private static player: media.AVPlayer | undefined = undefined;
   private static rawFd: resourceManager.RawFileDescriptor | undefined = undefined;
+  private static file: fs.File | undefined = undefined;
   private static rawPath: string = '';
   private static playing: boolean = false;
 
-  static async play(context: common.UIAbilityContext, rawPath: string): Promise<void> {
+  static async play(context: common.UIAbilityContext, rawPath: string, isBundledAudio: boolean = true): Promise<void> {
     await MindfulnessPlayer.stop(context);
     const player = await media.createAVPlayer();
     MindfulnessPlayer.player = player;
@@ -25,9 +27,15 @@ export class MindfulnessPlayer {
         MindfulnessPlayer.playing = false;
       }
     });
-    const fd = await context.resourceManager.getRawFd(rawPath);
-    MindfulnessPlayer.rawFd = fd;
-    player.fdSrc = { fd: fd.fd, offset: fd.offset, length: fd.length };
+    if (isBundledAudio) {
+      const fd = await context.resourceManager.getRawFd(rawPath);
+      MindfulnessPlayer.rawFd = fd;
+      player.fdSrc = { fd: fd.fd, offset: fd.offset, length: fd.length };
+    } else {
+      MindfulnessPlayer.file = fs.openSync(rawPath, fs.OpenMode.READ_ONLY);
+      const stat = fs.statSync(rawPath);
+      player.fdSrc = { fd: MindfulnessPlayer.file.fd, offset: 0, length: stat.size };
+    }
   }
 
   static async toggle(): Promise<boolean> {
@@ -70,6 +78,10 @@ export class MindfulnessPlayer {
     if (MindfulnessPlayer.rawFd) {
       context.resourceManager.closeRawFd(MindfulnessPlayer.rawPath);
       MindfulnessPlayer.rawFd = undefined;
+    }
+    if (MindfulnessPlayer.file) {
+      fs.closeSync(MindfulnessPlayer.file);
+      MindfulnessPlayer.file = undefined;
     }
     MindfulnessPlayer.rawPath = '';
     MindfulnessPlayer.playing = false;

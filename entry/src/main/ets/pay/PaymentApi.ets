@@ -2,7 +2,7 @@ import { http } from '@kit.NetworkKit';
 import { MembershipInfo, MembershipInfoJson, VipOrderData, VipProduct, VipProductJson } from './VipProduct';
 
 const BASE_URL: string = 'https://www.cjym123.cn/im/bot/navi/vip';
-const ALIPAY_APP_ID: string = '2021006169619056';
+const ALIPAY_APP_ID: string = '2021006190660434';
 
 interface ProductListData {
   list?: VipProductJson[];
@@ -80,11 +80,22 @@ export class PaymentApi {
       if (response.responseCode < 200 || response.responseCode >= 300) {
         throw new Error('网络异常，请稍后重试');
       }
-      const parsed = JSON.parse(response.result as string) as ApiResponse;
+      let parsed: ApiResponse;
+      try {
+        parsed = JSON.parse(response.result as string) as ApiResponse;
+      } catch (_) {
+        throw new Error('服务响应异常，请稍后重试');
+      }
       if (parsed.code !== 0 && parsed.code !== '0') {
         throw new Error(parsed.msg ?? '会员请求失败');
       }
+      if (parsed.data === undefined) {
+        throw new Error(parsed.msg ?? '服务响应缺少数据');
+      }
       return parsed;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '网络异常，请稍后重试';
+      throw new Error(message);
     } finally {
       client.destroy();
     }
