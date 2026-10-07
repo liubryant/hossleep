@@ -8,7 +8,7 @@ import { AlipayManager } from '../../pay/AlipayManager';
 import { PaymentApi } from '../../pay/PaymentApi';
 import { MembershipInfo, VipOrderData, VipProduct } from '../../pay/VipProduct';
 
-const VIP_AGREEMENT_URL = 'https://www.cjym123.cn/agreement_agentclaw_vip.html';
+const VIP_AGREEMENT_URL = 'https://www.cjym123.cn/im/bot/sleep/vip/agreement/member';
 
 @Component
 export struct VipMembershipPage {
@@ -240,8 +240,8 @@ export struct VipMembershipPage {
         .textAlign(TextAlign.Center)
 
       Row() {
-        this.benefitItem('♫', '全部会员\n专享声音')
-        this.benefitItem('⇩', '会员资源\n本地下载')
+        this.benefitItem('◌', '全部正念\n冥想内容')
+        this.benefitItem('♫', '全部助眠\n声音资源')
         this.benefitItem('∞', '会员期内\n无限畅听')
       }
       .width('100%')
@@ -334,7 +334,7 @@ export struct VipMembershipPage {
     if (this.memberActive) {
       return '会员已开通，可继续续费';
     }
-    return this.isLoggedIn ? '解锁全部助眠声音、故事与睡眠报告' : '登录后开通会员';
+    return this.isLoggedIn ? '解锁全部正念冥想与助眠声音' : '登录后开通会员';
   }
 
   @Builder
@@ -530,7 +530,7 @@ export struct VipMembershipPage {
             .fontFamily('MiSans-DemiBold')
             .fontColor('#FFEDBD')
 
-          Text('解锁会员专享声音，支持下载后随时畅听')
+          Text('解锁全部正念冥想与助眠声音，支持下载后畅听')
             .fontSize(13)
             .fontColor('#9C8A75')
         }
@@ -540,18 +540,18 @@ export struct VipMembershipPage {
 
         Row({ space: 16 }) {
           this.accessCard(
-            '♫ 声音内容',
+            '◌ 正念冥想',
             '普通用户',
-            '免费声音',
+            '前 4 个',
             'VIP 会员',
-            '全部会员声音'
+            '全部解锁'
           )
           this.accessCard(
-            '⇩ 本地下载',
+            '♫ 助眠声音',
             '普通用户',
-            '免费资源',
+            '前 30 个',
             'VIP 会员',
-            '会员资源可下载'
+            '全部解锁'
           )
         }
         .width('100%')
@@ -563,9 +563,9 @@ export struct VipMembershipPage {
           .margin({ left: 16, right: 16, top: 20 })
 
         Row() {
-          this.detailBenefitItem('♫', '会员专享声音')
+          this.detailBenefitItem('◌', '全部正念冥想')
           this.detailBenefitItem('⇩', '下载后播放')
-          this.detailBenefitItem('∞', '会员期内畅听')
+          this.detailBenefitItem('♫', '全部助眠声音')
         }
         .width('100%')
         .padding({ left: 16, right: 16, top: 16 })
@@ -756,7 +756,7 @@ export struct VipMembershipPage {
         .fontSize(12)
         .fontWeight(FontWeight.Bold)
         .fontColor('#999999')
-      Text('1. 会员服务开通后立即生效。\n2. 支付完成后以服务端订单状态为准。\n3. 如遇支付异常，请稍后重新进入会员页查看。')
+      Text('1. 普通用户可免费使用前 4 个正念冥想及前 30 个助眠声音。\n2. 会员服务开通后立即生效，会员期内全部解锁。\n3. 支付完成后以服务端订单状态为准；如遇异常，请稍后重新进入会员页查看。')
         .fontSize(12)
         .fontColor('#666666')
         .lineHeight(19)

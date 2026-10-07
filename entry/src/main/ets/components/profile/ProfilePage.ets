@@ -42,6 +42,7 @@ export struct ProfilePage {
             .padding({ left: 4 })
 
           this.header()
+          this.vipCard()
           this.permissionCard()
           this.monitorCard()
           this.dataCard()
@@ -84,7 +85,7 @@ export struct ProfilePage {
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
             .fontColor('#FFF2D2')
-          Text(this.isVip ? '会员权益已生效，可继续续费' : '解锁全部声音、故事与睡眠报告')
+          Text(this.isVip ? '会员权益已生效，可继续续费' : '解锁全部正念冥想与助眠声音')
             .fontFamily('MiSans')
             .fontSize(11)
             .fontColor('#C8A97E')
@@ -109,11 +110,11 @@ export struct ProfilePage {
       Divider().color('#22FFFFFF')
 
       Row() {
+        this.vipBenefit('✦ 全部正念冥想')
+        Divider().vertical(true).height(12).color('#33FFFFFF')
         this.vipBenefit('✦ 全部助眠声音')
         Divider().vertical(true).height(12).color('#33FFFFFF')
-        this.vipBenefit('✦ 全部睡前故事')
-        Divider().vertical(true).height(12).color('#33FFFFFF')
-        this.vipBenefit('✦ 专属睡眠报告')
+        this.vipBenefit('✦ 专享内容更新')
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)

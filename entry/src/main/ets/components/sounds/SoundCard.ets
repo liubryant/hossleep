@@ -12,6 +12,7 @@ export struct SoundCard {
   @Prop isPlaying: boolean = false;
   @Prop isFavorite: boolean = false;
   @Prop isCached: boolean = true;
+  @Prop isVipContent: boolean = false;
   @Prop downloadProgress: number = -1;
   onToggle: () => void = () => {};
   onFavorite: () => void = () => {};
@@ -28,6 +29,26 @@ export struct SoundCard {
             heightValue: 136,
             radius: SleepRadius.card
           })
+
+          if (this.isVipContent) {
+            Row({ space: 3 }) {
+              Text('♛')
+                .fontSize(11)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#FFE0A0')
+              Text('VIP')
+                .fontFamily('MiSans')
+                .fontSize(9)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Color.White)
+            }
+            .height(23)
+            .padding({ left: 7, right: 8 })
+            .backgroundColor('#CC9A6500')
+            .borderRadius(12)
+            .position({ x: 7, y: 7 })
+            .zIndex(4)
+          }
 
           Stack() {
             Image(this.isFavorite ?

@@ -4,12 +4,14 @@
  */
 import { SleepColor, SleepText } from '../../common/SleepDesign';
 import { common } from '@kit.AbilityKit';
+import { curves } from '@kit.ArkUI';
 import { util } from '@kit.ArkTS';
 import { SOUND_CATEGORIES, SOUND_SCENES } from '../../models/SleepData';
 import { SoundSceneItem } from '../../models/SleepModels';
 import { SoundPlayer } from '../../services/SoundPlayer';
 import { SoundCard } from './SoundCard';
 import { MINDFULNESS_ITEMS, MindfulnessItem } from '../../models/MindfulnessData';
+import { VipAccessPolicy } from '../../pay/VipAccessPolicy';
 
 interface SoundManifestItem {
   id: string;
@@ -33,6 +35,7 @@ export struct SoundHomePage {
   @Prop downloadProgress: number = -1;
   @Prop favoriteSoundIds: string[] = [];
   @Prop playbackStopRemainingSeconds: number = 0;
+  @Prop isVip: boolean = false;
   onSelectCategory: (index: number) => void = () => {};
   onOpenStories: () => void = () => {};
   onPlaySound: (scene: SoundSceneItem) => void = () => {};
@@ -42,10 +45,13 @@ export struct SoundHomePage {
   onScenesLoaded: (scenes: SoundSceneItem[]) => void = () => {};
   onSetPlaybackStopTimer: (minutes: number) => void = () => {};
   onCancelPlaybackStopTimer: () => void = () => {};
+  onRequireVip: (title: string, kind: string) => void = () => {};
   @State private scenes: SoundSceneItem[] = SOUND_SCENES;
   @State private searchKeyword: string = '';
   @State private headerVisibleCharacterCount: number = 0;
   @State private showsSleepGreeting: boolean = true;
+  @State private mindfulnessGalleryIndex: number = 0;
+  @State private mindfulnessGalleryDragOffset: number = 0;
   private didStartHeaderAnimation: boolean = false;
 
   aboutToAppear(): void {
@@ -85,8 +91,13 @@ export struct SoundHomePage {
                   isPlaying: this.activeSoundId === scene.id,
                   isFavorite: this.favoriteSoundIds.includes(scene.id),
                   isCached: SoundPlayer.isCached(getContext(this) as common.UIAbilityContext, scene),
+                  isVipContent: VipAccessPolicy.soundRequiresVip(scene),
                   downloadProgress: this.downloadingSoundId === scene.id ? this.downloadProgress : -1,
                   onToggle: () => {
+                    if (VipAccessPolicy.soundRequiresVip(scene) && !this.isVip) {
+                      this.onRequireVip(scene.title, 'sound');
+                      return;
+                    }
                     this.onPlaySound(scene);
                   },
                   onFavorite: () => {
@@ -180,19 +191,244 @@ export struct SoundHomePage {
         Blank()
         Text('更多').fontSize(13).fontColor(SleepColor.primary).onClick(this.onOpenMindfulness)
       }.width('100%').padding({ left: 16, right: 16 })
-      Scroll() {
-        Row({ space: 12 }) {
-          ForEach(MINDFULNESS_ITEMS.slice(0, 6), (item: MindfulnessItem) => {
-            Column({ space: 7 }) {
-              Image(`resource://RAWFILE/${item.cover}`).width(112).height(148)
-                .objectFit(ImageFit.Cover).borderRadius(12).clip(true).syncLoad(true)
-              Text(item.title).width(112).fontSize(13).fontWeight(FontWeight.Normal)
-                .fontColor(SleepColor.textPrimary).maxLines(1)
-            }.alignItems(HorizontalAlign.Start).onClick(() => this.onOpenMeditation(item))
+      Column({ space: 4 }) {
+        Stack({ alignContent: Alignment.Top }) {
+          ForEach(MINDFULNESS_ITEMS.slice(0, 6), (item: MindfulnessItem, index: number) => {
+            this.homeMindfulnessGalleryCard(item, index)
           }, (item: MindfulnessItem) => item.id)
-        }.padding({ left: 16, right: 16 })
-      }.height(178).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
+        }
+        .width('100%')
+        .height(206)
+        .clip(false)
+        .gesture(
+          PanGesture({ fingers: 1, direction: PanDirection.Horizontal, distance: 4 })
+            .onActionUpdate((event: GestureEvent) => {
+              this.mindfulnessGalleryDragOffset = this.mindfulnessDragResistance(event.offsetX);
+            })
+            .onActionEnd((event: GestureEvent) => {
+              const projectedOffset = event.offsetX + Math.max(-1200, Math.min(1200, event.velocityX)) * 0.045;
+              if (projectedOffset <= -38) {
+                this.mindfulnessGalleryIndex =
+                  (this.mindfulnessGalleryIndex + 1) % Math.min(6, MINDFULNESS_ITEMS.length);
+              } else if (projectedOffset >= 38) {
+                this.mindfulnessGalleryIndex =
+                  (this.mindfulnessGalleryIndex - 1 + Math.min(6, MINDFULNESS_ITEMS.length)) %
+                    Math.min(6, MINDFULNESS_ITEMS.length);
+              }
+              this.mindfulnessGalleryDragOffset = 0;
+            })
+            .onActionCancel(() => {
+              this.mindfulnessGalleryDragOffset = 0;
+            })
+        )
+
+        Row({ space: 6 }) {
+          ForEach(MINDFULNESS_ITEMS.slice(0, 6), (dotItem: MindfulnessItem, index: number) => {
+            Row()
+              .width(this.mindfulnessGalleryIndex === index ? 18 : 5)
+              .height(5)
+              .borderRadius(3)
+              .backgroundColor(this.mindfulnessGalleryIndex === index ? SleepColor.primary : '#38111827')
+              .animation({ duration: 240, curve: Curve.EaseOut })
+          }, (dotItem: MindfulnessItem) => `mindfulness-dot-${dotItem.id}`)
+        }
+        .height(15)
+        .justifyContent(FlexAlign.Center)
+      }
+      .width('100%')
+      .height(225)
+      .constraintSize({ maxWidth: 670 })
     }.width('100%').padding({ top: 12 })
+  }
+
+  @Builder
+  private homeMindfulnessGalleryCard(item: MindfulnessItem, index: number) {
+    Stack({ alignContent: Alignment.Center }) {
+      Stack({ alignContent: Alignment.BottomStart }) {
+        Image(`resource://RAWFILE/${item.cover}`)
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Cover)
+          .syncLoad(true)
+
+        Column()
+          .width('100%')
+          .height(110)
+          .linearGradient({
+            angle: 180,
+            colors: [['#00000000', 0], ['#D9111827', 0.62], ['#F2111827', 1]]
+          })
+
+        Column({ space: 4 }) {
+          Text(`${index === this.mindfulnessGalleryIndex ? 'FEATURED' : 'MINDFUL'} · 0${index + 1}`)
+            .fontFamily('MiSans')
+            .fontSize(7.5)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#BFFFFFFF')
+            .letterSpacing(1.1)
+          Text(item.title)
+            .width('100%')
+            .fontFamily('MiSans')
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Color.White)
+            .maxLines(1)
+          Text(item.subtitle)
+            .width('100%')
+            .fontFamily('MiSans')
+            .fontSize(9)
+            .fontColor('#CFFFFFFF')
+            .maxLines(1)
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 14, right: 14, bottom: 15 })
+
+        if (VipAccessPolicy.mindfulnessRequiresVip(index)) {
+          this.vipBadge()
+        }
+      }
+      .width(148)
+      .height(192)
+      .borderRadius(18)
+      .clip(true)
+      .border({
+        width: this.mindfulnessGalleryDistance(index) < 0.5 ? 1 : 0.6,
+        color: this.mindfulnessGalleryDistance(index) < 0.5 ? '#526A7694' : '#354D5869'
+      })
+      .rotate({
+        x: 0,
+        y: 1,
+        z: 0,
+        angle: this.mindfulnessGalleryDepthRotation(index),
+        perspective: 900
+      })
+      .shadow({
+        radius: Math.max(5, 22 - this.mindfulnessGalleryDistance(index) * 15),
+        color: this.mindfulnessGalleryDistance(index) < 0.55 ? '#5C061225' : '#26061225',
+        offsetY: Math.max(3, 10 - this.mindfulnessGalleryDistance(index) * 6)
+      })
+      .animation({
+        duration: this.mindfulnessGalleryDragOffset === 0 ? 520 : 0,
+        curve: this.mindfulnessGalleryDragOffset === 0 ?
+          curves.interpolatingSpring(0, 1, 280, 30) : Curve.Linear
+      })
+    }
+    .width(148)
+    .height(192)
+    .scale({
+      x: this.mindfulnessGalleryScale(index),
+      y: this.mindfulnessGalleryScale(index)
+    })
+    .translate({
+      x: this.mindfulnessGalleryOffsetX(index),
+      y: this.mindfulnessGalleryOffsetY(index)
+    })
+    .opacity(this.mindfulnessGalleryOpacity(index))
+    .zIndex(this.mindfulnessGalleryZIndex(index))
+    .visibility(this.mindfulnessGalleryDistance(index) <= 2.6 ? Visibility.Visible : Visibility.Hidden)
+    .animation({
+      duration: this.mindfulnessGalleryDragOffset === 0 ? 520 : 0,
+      curve: this.mindfulnessGalleryDragOffset === 0 ?
+        curves.interpolatingSpring(0, 1, 280, 30) : Curve.Linear
+    })
+    .onClick(() => {
+      if (index !== this.mindfulnessGalleryIndex) {
+        this.mindfulnessGalleryIndex = index;
+        return;
+      }
+      if (VipAccessPolicy.mindfulnessRequiresVip(index) && !this.isVip) {
+        this.onRequireVip(item.title, 'mindfulness');
+        return;
+      }
+      this.onOpenMeditation(item);
+    })
+  }
+
+  private mindfulnessRelativePosition(index: number): number {
+    const count = Math.min(6, MINDFULNESS_ITEMS.length);
+    let position = index - this.mindfulnessGalleryIndex;
+    if (Math.abs(position) === count / 2) {
+      position = this.mindfulnessGalleryDragOffset < 0 ? count / 2 : -count / 2;
+    } else if (position > count / 2) {
+      position -= count;
+    } else if (position < -count / 2) {
+      position += count;
+    }
+    return position;
+  }
+
+  private mindfulnessDragResistance(rawOffset: number): number {
+    const direction = rawOffset < 0 ? -1 : 1;
+    const distance = Math.abs(rawOffset);
+    const resistedDistance = distance * 0.72 / (1 + distance / 160);
+    return direction * Math.min(68, resistedDistance);
+  }
+
+  private mindfulnessEffectivePosition(index: number): number {
+    return this.mindfulnessRelativePosition(index) + this.mindfulnessGalleryDragOffset / 94;
+  }
+
+  private mindfulnessGalleryDistance(index: number): number {
+    return Math.abs(this.mindfulnessEffectivePosition(index));
+  }
+
+  private mindfulnessGalleryScale(index: number): number {
+    const distance = Math.min(2.5, this.mindfulnessGalleryDistance(index));
+    if (distance <= 1) {
+      return 1 - distance * 0.16;
+    }
+    return Math.max(0.62, 0.84 - (distance - 1) * 0.16);
+  }
+
+  private mindfulnessGalleryOpacity(index: number): number {
+    const distance = this.mindfulnessGalleryDistance(index);
+    if (distance <= 1) {
+      return 1 - distance * 0.14;
+    }
+    if (distance <= 2) {
+      return 0.86 - (distance - 1) * 0.24;
+    }
+    return Math.max(0, 0.62 - (distance - 2) * 1.24);
+  }
+
+  private mindfulnessGalleryDepthRotation(index: number): number {
+    const position = this.mindfulnessEffectivePosition(index);
+    const distance = Math.abs(position);
+    const direction = position < 0 ? 1 : -1;
+    const angle = distance <= 1 ? distance * 14 : 14 + (distance - 1) * 8;
+    return direction * Math.min(22, angle);
+  }
+
+  private mindfulnessGalleryOffsetX(index: number): number {
+    const position = this.mindfulnessEffectivePosition(index);
+    const direction = position < 0 ? -1 : 1;
+    const distance = Math.abs(position);
+    const offset = distance <= 1 ? distance * 64 : 64 + (distance - 1) * 50;
+    return direction * offset;
+  }
+
+  private mindfulnessGalleryOffsetY(index: number): number {
+    const distance = this.mindfulnessGalleryDistance(index);
+    return distance <= 1 ? distance * 8 : 8 + (distance - 1) * 2;
+  }
+
+  private mindfulnessGalleryZIndex(index: number): number {
+    return Math.max(0, 100 - Math.floor(this.mindfulnessGalleryDistance(index) * 40));
+  }
+
+  @Builder
+  private vipBadge() {
+    Row({ space: 2 }) {
+      Text('♛').fontSize(10).fontWeight(FontWeight.Bold).fontColor('#FFE0A0')
+      Text('VIP').fontFamily('MiSans').fontSize(8).fontWeight(FontWeight.Bold).fontColor(Color.White)
+    }
+    .width(44)
+    .height(20)
+    .justifyContent(FlexAlign.Center)
+    .backgroundColor('#CC9A6500')
+    .borderRadius(10)
+    .position({ x: 94, y: 10 })
   }
 
   @Builder

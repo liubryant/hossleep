@@ -6,15 +6,18 @@ import { SoundSceneItem } from '../../models/SleepModels';
 import { MindfulnessCatalog } from '../../services/MindfulnessCatalog';
 import { SoundPlayer } from '../../services/SoundPlayer';
 import { SoundCoverImage } from '../common/CoverImages';
+import { VipAccessPolicy } from '../../pay/VipAccessPolicy';
 
 @Component
 export struct MindfulnessHomePage {
   @Prop scenes: SoundSceneItem[] = [];
   @Prop downloadingSoundId: string = '';
   @Prop downloadProgress: number = -1;
+  @Prop isVip: boolean = false;
   onBack: () => void = () => {};
   onOpenMeditation: (item: MindfulnessItem) => void = () => {};
   onOpenNature: (scene: SoundSceneItem) => void = () => {};
+  onRequireVip: (title: string, kind: string) => void = () => {};
   @State private bannerIndex: number = 0;
   @State private remoteItems: MindfulnessItem[] = [];
   @State private downloadingMindfulnessId: string = '';
@@ -113,10 +116,10 @@ export struct MindfulnessHomePage {
         ForEach(this.meditationColumnStarts(), (startIndex: number) => {
           Column({ space: 12 }) {
             if (startIndex < this.allMeditationItems().length) {
-              this.meditationCard(this.allMeditationItems()[startIndex])
+              this.meditationCard(this.allMeditationItems()[startIndex], startIndex)
             }
             if (startIndex + 1 < this.allMeditationItems().length) {
-              this.meditationCard(this.allMeditationItems()[startIndex + 1])
+              this.meditationCard(this.allMeditationItems()[startIndex + 1], startIndex + 1)
             }
           }
         }, (startIndex: number) => `${startIndex}`)
@@ -127,11 +130,14 @@ export struct MindfulnessHomePage {
   }
 
   @Builder
-  private meditationCard(item: MindfulnessItem) {
+  private meditationCard(item: MindfulnessItem, index: number) {
     Column({ space: 8 }) {
       Stack({ alignContent: Alignment.BottomEnd }) {
         Image(`resource://RAWFILE/${item.cover}`).width(136).height(136)
           .objectFit(ImageFit.Cover).borderRadius(14).clip(true)
+        if (VipAccessPolicy.mindfulnessRequiresVip(index)) {
+          this.vipBadge()
+        }
         if (this.downloadingMindfulnessId === item.id) {
           Text(`${Math.floor(Math.max(0, this.mindfulnessDownloadProgress) * 100)}%`)
             .fontSize(10).fontColor(Color.White).width(38).height(38).textAlign(TextAlign.Center)
@@ -147,7 +153,7 @@ export struct MindfulnessHomePage {
       Text(item.title).width(136).fontSize(14).fontWeight(FontWeight.Medium).fontColor(SleepColor.textPrimary).maxLines(1)
       Text(item.subtitle).width(136).fontSize(11).fontColor(SleepColor.textSecondary).maxLines(1)
     }
-    .width(136).height(185).alignItems(HorizontalAlign.Start).onClick(() => this.openMeditation(item))
+    .width(136).height(185).alignItems(HorizontalAlign.Start).onClick(() => this.openMeditation(item, index))
   }
 
   private allMeditationItems(): MindfulnessItem[] {
@@ -172,7 +178,11 @@ export struct MindfulnessHomePage {
       });
   }
 
-  private openMeditation(item: MindfulnessItem): void {
+  private openMeditation(item: MindfulnessItem, index: number): void {
+    if (VipAccessPolicy.mindfulnessRequiresVip(index) && !this.isVip) {
+      this.onRequireVip(item.title, 'mindfulness');
+      return;
+    }
     if (this.downloadingMindfulnessId.length > 0) {
       promptAction.showToast({ message: '当前正念音频正在下载，请稍候' });
       return;
@@ -223,6 +233,9 @@ export struct MindfulnessHomePage {
     Column({ space: 8 }) {
       Stack({ alignContent: Alignment.BottomEnd }) {
         SoundCoverImage({ index: scene.index, directory: scene.directory ?? '', coverFile: scene.coverFile ?? 'cover.jpg', widthValue: 136, heightValue: 136, radius: 14 })
+        if (VipAccessPolicy.soundRequiresVip(scene)) {
+          this.vipBadge()
+        }
         if (this.downloadingSoundId === scene.id) {
           Text(`${Math.floor(Math.max(0, this.downloadProgress) * 100)}%`).fontSize(10).fontColor(Color.White)
             .width(38).height(38).textAlign(TextAlign.Center).backgroundColor('#88000000').borderRadius(19).margin(9)
@@ -237,7 +250,27 @@ export struct MindfulnessHomePage {
       Text(scene.title).width(136).fontSize(14).fontWeight(FontWeight.Medium).fontColor(SleepColor.textPrimary).maxLines(1)
       Text(scene.subtitle.length > 0 ? scene.subtitle : '聆听自然，安然入眠').width(136).fontSize(11).fontColor(SleepColor.textSecondary).maxLines(1)
     }
-    .width(136).height(185).alignItems(HorizontalAlign.Start).onClick(() => this.onOpenNature(scene))
+    .width(136).height(185).alignItems(HorizontalAlign.Start).onClick(() => {
+      if (VipAccessPolicy.soundRequiresVip(scene) && !this.isVip) {
+        this.onRequireVip(scene.title, 'sound');
+        return;
+      }
+      this.onOpenNature(scene);
+    })
+  }
+
+  @Builder
+  private vipBadge() {
+    Row({ space: 3 }) {
+      Text('♛').fontSize(10).fontWeight(FontWeight.Bold).fontColor('#FFE0A0')
+      Text('VIP').fontFamily('MiSans').fontSize(8).fontWeight(FontWeight.Bold).fontColor(Color.White)
+    }
+    .height(22)
+    .padding({ left: 7, right: 8 })
+    .backgroundColor('#CC9A6500')
+    .borderRadius(11)
+    .position({ x: 8, y: 8 })
+    .zIndex(5)
   }
 
   private natureItems(): SoundSceneItem[] {

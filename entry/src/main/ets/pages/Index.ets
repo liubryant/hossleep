@@ -24,6 +24,9 @@ import { NaturePlayerPage } from '../components/sounds/NaturePlayerPage';
 import { StoryHomePage } from '../components/stories/StoryHomePage';
 import { RotatingStoryCover } from '../components/stories/RotatingStoryCover';
 import { VipMembershipPage } from '../components/vip/VipMembershipPage';
+import { PaymentApi } from '../pay/PaymentApi';
+import { MembershipInfo } from '../pay/VipProduct';
+import { VipAccessPolicy } from '../pay/VipAccessPolicy';
 import { SOUND_SCENES, STORY_ITEMS } from '../models/SleepData';
 import { SleepDetectedEvent, SleepReportData, SoundSceneItem, StoryListItem } from '../models/SleepModels';
 import { MINDFULNESS_ITEMS, MindfulnessItem } from '../models/MindfulnessData';
@@ -105,6 +108,8 @@ struct Index {
   @State private securityMessage: string = '';
   @State private securityBusy: boolean = false;
   @State private vipSoundPromptVisible: boolean = false;
+  @State private vipPromptTitle: string = '';
+  @State private vipPromptKind: string = 'sound';
   @State private playbackStopRemainingSeconds: number = 0;
   private sleepTimer: number = -1;
   private storyPlaybackTimer: number = -1;
@@ -141,6 +146,11 @@ struct Index {
     }
     if (this.route === 'legalVip') {
       this.route = 'vip';
+      return true;
+    }
+    if (this.route === 'feedback') {
+      this.route = 'home';
+      this.activeTab = 3;
       return true;
     }
     if (this.route === 'mindfulnessHome') {
@@ -209,6 +219,7 @@ struct Index {
             this.phoneNumber = phone;
             this.accessToken = accessToken;
             AppSettings.login(this.context(), phone, accessToken);
+            this.refreshVipStatus();
             this.activeTab = 3;
             this.route = this.legalReturnRoute === 'vip' ? 'vip' : 'home';
           },
@@ -261,6 +272,15 @@ struct Index {
         this.legalPage('用户协议')
       } else if (this.route === 'legalPrivacy') {
         this.legalPage('隐私政策')
+      } else if (this.route === 'feedback') {
+        LegalWebPage({
+          title: '客服反馈',
+          url: 'https://www.cjym123.cn/feedback_agentclaw.html',
+          onBack: () => {
+            this.route = 'home';
+            this.activeTab = 3;
+          }
+        })
       } else if (this.route === 'password') {
         this.passwordPage()
       } else if (this.route === 'deleteAccount') {
@@ -289,7 +309,7 @@ struct Index {
       } else if (this.route === 'legalVip') {
         LegalWebPage({
           title: '会员服务协议',
-          url: 'https://www.cjym123.cn/agreement_agentclaw_vip.html',
+          url: 'https://www.cjym123.cn/im/bot/sleep/vip/agreement/member',
           onBack: () => {
             this.route = 'vip';
           }
@@ -321,6 +341,7 @@ struct Index {
           downloadProgress: this.soundDownloadProgress,
           favoriteSoundIds: this.favoriteSoundIds,
           playbackStopRemainingSeconds: this.playbackStopRemainingSeconds,
+          isVip: this.isVip,
           onSelectCategory: (index: number) => {
             this.soundCategory = index;
           },
@@ -331,6 +352,11 @@ struct Index {
             this.route = 'mindfulnessHome';
           },
           onOpenMeditation: (item: MindfulnessItem) => {
+            const itemIndex = MINDFULNESS_ITEMS.findIndex((value: MindfulnessItem): boolean => value.id === item.id);
+            if (itemIndex >= 0 && VipAccessPolicy.mindfulnessRequiresVip(itemIndex) && !this.isVip) {
+              this.showVipPrompt(item.title, 'mindfulness');
+              return;
+            }
             SoundPlayer.stop(this.context());
             StorySpeaker.stop();
             this.soundPlaying = false;
@@ -352,6 +378,9 @@ struct Index {
           onCancelPlaybackStopTimer: () => {
             this.cancelPlaybackStopTimer(true);
           },
+          onRequireVip: (title: string, kind: string) => {
+            this.showVipPrompt(title, kind);
+          },
           onToggleFavorite: (id: string) => {
             if (this.favoriteSoundIds.includes(id)) {
               this.favoriteSoundIds = this.favoriteSoundIds.filter((value: string): boolean => value !== id);
@@ -364,6 +393,10 @@ struct Index {
             }
           },
           onPlaySound: (scene: SoundSceneItem) => {
+            if (VipAccessPolicy.soundRequiresVip(scene) && !this.isVip) {
+              this.showVipPrompt(scene.title, 'sound');
+              return;
+            }
             if (this.downloadingSoundId.length > 0) {
               promptAction.showToast({ message: '当前声音正在下载，请稍候' });
               return;
@@ -520,6 +553,9 @@ struct Index {
         activeIndex: this.activeTab,
         onSelect: (index: number) => {
           this.activeTab = index;
+          if (index === 3) {
+            this.refreshVipStatus();
+          }
         }
       })
     }
@@ -533,7 +569,11 @@ struct Index {
       scenes: this.allSoundScenes,
       downloadingSoundId: this.downloadingSoundId,
       downloadProgress: this.soundDownloadProgress,
+      isVip: this.isVip,
       onBack: () => this.route = 'home',
+      onRequireVip: (title: string, kind: string) => {
+        this.showVipPrompt(title, kind);
+      },
       onOpenMeditation: (item: MindfulnessItem) => {
         SoundPlayer.stop(this.context());
         StorySpeaker.stop();
@@ -548,6 +588,10 @@ struct Index {
         this.setStoryImmersiveMode(true);
       },
       onOpenNature: (scene: SoundSceneItem) => {
+        if (VipAccessPolicy.soundRequiresVip(scene) && !this.isVip) {
+          this.showVipPrompt(scene.title, 'sound');
+          return;
+        }
         if (this.downloadingSoundId.length > 0) {
           promptAction.showToast({ message: '当前声音正在下载，请稍候' });
           return;
@@ -1636,6 +1680,8 @@ struct Index {
     } else if (action === 'privacyPolicy') {
       this.legalReturnRoute = 'home';
       this.route = 'legalPrivacy';
+    } else if (action === 'feedback') {
+      this.route = 'feedback';
     } else if (action === 'password') {
       this.route = 'password';
     } else if (action === 'deleteAccount') {
@@ -1649,6 +1695,27 @@ struct Index {
     } else if (action === 'vip') {
       this.route = 'vip';
     }
+  }
+
+  private showVipPrompt(title: string, kind: string): void {
+    this.vipPromptTitle = title;
+    this.vipPromptKind = kind === 'mindfulness' ? 'mindfulness' : 'sound';
+    this.vipSoundPromptVisible = true;
+  }
+
+  private refreshVipStatus(): void {
+    const token = this.accessToken;
+    if (!this.isLoggedIn || token.length === 0) {
+      this.isVip = false;
+      return;
+    }
+    PaymentApi.shared.getMembership(token)
+      .then((info: MembershipInfo) => {
+        this.isVip = info.active;
+      })
+      .catch(() => {
+        // 网络异常时保留当前会员状态，避免短暂断网导致已解锁内容被立即收回。
+      });
   }
 
   @Builder
@@ -1765,6 +1832,9 @@ struct Index {
       this.isLoggedIn = saved.isLoggedIn;
       this.phoneNumber = saved.phoneNumber;
       this.accessToken = saved.accessToken;
+      if (saved.agreementAccepted && saved.isLoggedIn && saved.accessToken.length > 0) {
+        this.refreshVipStatus();
+      }
       this.saveClips = saved.saveAudioClips;
       this.sensitivity = saved.sensitivity * 100;
       this.favoriteSoundIds = saved.favoriteSoundIds;
@@ -2051,106 +2121,121 @@ struct Index {
 
   @Builder
   private vipSoundPrompt() {
-    Stack() {
+    Stack({ alignContent: Alignment.Bottom }) {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#78000000')
+        .backgroundColor('#66000000')
         .onClick(() => {
           this.vipSoundPromptVisible = false;
         })
 
-      Column({ space: 0 }) {
-        Stack() {
-          Column()
-            .width(78)
-            .height(78)
-            .linearGradient({
-              angle: 135,
-              colors: [['#FFF2C7', 0], ['#E9B85D', 1]] as [string, number][]
-            })
-            .borderRadius(39)
-          Text('♛')
-            .fontFamily('MiSans')
-            .fontSize(38)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#704317')
-        }
-        .width(78)
-        .height(78)
-        .margin({ top: 24, bottom: 15 })
+      Column({ space: 10 }) {
+        Row()
+          .width(38)
+          .height(4)
+          .backgroundColor('#D7D3CF')
+          .borderRadius(2)
+          .margin({ bottom: 4 })
 
-        Text('解锁 VIP 助眠声音')
+        Text(this.vipPromptKind === 'mindfulness' ? 'VIP 专享正念' : 'VIP 专享声音')
           .fontFamily('MiSans')
-          .fontSize(22)
+          .fontSize(17)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#FFF1CE')
+          .fontColor('#1A1A2E')
 
-        Text('第 41 个及后续声音为会员专享\n开通后即可下载并无限畅听')
+        Text(`“${this.vipPromptTitle}”需要开通会员后播放`)
           .fontFamily('MiSans')
-          .fontSize(14)
-          .fontColor('#D7BC91')
-          .lineHeight(22)
+          .fontSize(13)
+          .fontColor('#6E6E73')
+          .lineHeight(19)
+          .maxLines(2)
           .textAlign(TextAlign.Center)
-          .margin({ top: 10, bottom: 20 })
 
-        Row({ space: 8 }) {
-          Text('海量助眠声')
-            .fontFamily('MiSans')
-            .fontSize(11)
-            .fontColor('#F2D29E')
-          Text('高速下载')
-            .fontFamily('MiSans')
-            .fontSize(11)
-            .fontColor('#F2D29E')
-          Text('会员专享')
-            .fontFamily('MiSans')
-            .fontSize(11)
-            .fontColor('#F2D29E')
-        }
-        .margin({ bottom: 22 })
+        this.vipPromptBenefit(
+          this.vipPromptKind === 'mindfulness' ? '◌' : '♫',
+          this.vipPromptKind === 'mindfulness' ? '正念冥想内容' : '全部助眠声音',
+          this.vipPromptKind === 'mindfulness' ? '普通用户：前 4 个' : '普通用户：前 30 个',
+          'VIP：全部解锁'
+        )
+        this.vipPromptBenefit('♛', '会员专享体验', '基础内容畅听', '专享内容畅听')
 
-        Text('立即开通 VIP')
+        Text('立即开通会员')
           .fontFamily('MiSans')
-          .fontSize(16)
+          .fontSize(15)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#553112')
+          .fontColor('#5C3314')
           .width('100%')
-          .height(48)
+          .height(44)
           .textAlign(TextAlign.Center)
-          .backgroundColor('#F4CF8A')
-          .borderRadius(24)
+          .linearGradient({
+            angle: 0,
+            colors: [['#FFE09E', 0], ['#DB9942', 1]] as [string, number][]
+          })
+          .borderRadius(14)
+          .margin({ top: 2 })
           .onClick(() => {
             this.vipSoundPromptVisible = false;
             this.route = 'vip';
           })
 
-        Text('暂不开通')
+        Text('稍后再说')
           .fontFamily('MiSans')
-          .fontSize(13)
-          .fontColor('#A98C67')
-          .height(44)
+          .fontSize(14)
+          .fontColor('#6E6E73')
+          .height(34)
           .width('100%')
           .textAlign(TextAlign.Center)
           .onClick(() => {
             this.vipSoundPromptVisible = false;
           })
       }
-      .width('84%')
-      .padding({ left: 22, right: 22, bottom: 8 })
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 10, bottom: 18 })
       .alignItems(HorizontalAlign.Center)
-      .linearGradient({
-        angle: 145,
-        colors: [['#38281D', 0], ['#17100C', 1]] as [string, number][]
-      })
-      .border({ width: 1, color: '#8A633D' })
-      .borderRadius(24)
-      .shadow({ radius: 30, color: '#55000000', offsetY: 12 })
+      .backgroundColor('#FFFBF7')
+      .borderRadius({ topLeft: 22, topRight: 22 })
+      .shadow({ radius: 24, color: '#33000000', offsetY: -5 })
     }
     .width('100%')
     .height('100%')
-    .alignContent(Alignment.Center)
     .zIndex(100)
+  }
+
+  @Builder
+  private vipPromptBenefit(icon: string, title: string, freeText: string, vipText: string) {
+    Row({ space: 12 }) {
+      Text(icon)
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#BF7A26')
+        .width(34)
+        .height(34)
+        .textAlign(TextAlign.Center)
+        .backgroundColor('#FFF4DE')
+        .borderRadius(17)
+
+      Column({ space: 5 }) {
+        Text(title)
+          .fontFamily('MiSans')
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#1A1A2E')
+          .width('100%')
+          .textAlign(TextAlign.Start)
+        Row() {
+          Text(freeText).fontFamily('MiSans').fontSize(11).fontColor('#77777D')
+          Blank()
+          Text(vipText).fontFamily('MiSans').fontSize(11).fontWeight(FontWeight.Medium).fontColor('#BF7A26')
+        }.width('100%')
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+    }
+    .width('100%')
+    .padding({ left: 12, right: 12, top: 9, bottom: 9 })
+    .backgroundColor('#FFF8ED')
+    .borderRadius(10)
   }
 
   private pad(value: number): string {
